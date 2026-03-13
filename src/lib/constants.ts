@@ -28,9 +28,9 @@ export const ROUNDING = {
 };
 
 // Based on the provided roles enum
-export type Role = 'resident' | 'member' | 'moderator' | 'secretary' | 'treasurer' | 'president' | 'superadmin';
+export type Role = 'socio' | 'moderador' | 'secretario' | 'tesorero' | 'presidente' | 'director' | 'superadmin';
 
 export const isAdminRole = (role: Role | null | undefined) => {
     if (!role) return false;
-    return ['secretary', 'treasurer', 'president', 'superadmin'].includes(role);
+    return ['secretario', 'tesorero', 'presidente', 'director', 'superadmin'].includes(role);
 };

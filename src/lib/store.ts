@@ -152,6 +152,11 @@ type AppStore = {
     updateOrgSettings: (s: Partial<OrgSettings>) => void;
     setFavors: (favors: Favor[]) => void;
     setMapPins: (pins: MapPin[]) => void;
+    setMembers: (members: Member[]) => void;
+    setSolicitudes: (solicitudes: Solicitud[]) => void;
+    setAnnouncements: (announcements: Announcement[]) => void;
+    setDocuments: (documents: Document[]) => void;
+    setEvents: (events: EventItem[]) => void;
 };
 
 const MONTHS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
@@ -164,58 +169,19 @@ const now = () => {
 export const useAppStore = create<AppStore>()(
     persist(
         (set) => ({
-            announcements: [
-                { id: '1', title: 'Reunión mensual de vecinos', body: 'Los invitamos a la reunión mensual este sábado a las 10:00 hrs en la sede vecinal. Se tratarán temas de seguridad y mejoras al barrio.', priority: 'important', date: '28 Feb 2026', replies: [] },
-                { id: '2', title: 'Corte de agua programado', body: 'Se informa corte de agua el día lunes de 09:00 a 14:00 hrs por trabajos de mantenimiento en la red de agua potable.', priority: 'normal', date: '27 Feb 2026', replies: [] },
-                { id: '3', title: 'Nuevo horario de recolección', body: 'A partir de marzo, la recolección de basura será los días lunes, miércoles y viernes a partir de las 07:00 hrs.', priority: 'normal', date: '25 Feb 2026', replies: [] },
-            ],
-            solicitudes: [
-                { id: '1', title: 'Certificado de Residencia', description: 'Necesito un certificado para presentarlo en la municipalidad', category: 'Certificado', user: 'Javier Aravena Espejo', userEmail: 'javier.aravena25@gmail.com', date: '10 Feb 2026 14:30', status: 'Abierta', hasImage: false, replies: [], seenByAdmin: false, seenByUser: true, trackingNumber: 'SOL-FREE-001' },
-                { id: '2', title: 'Poda de árboles', description: 'Hay unas ramas peligrosas cerca de los cables en mi calle', category: 'Solicitud Municipal', user: 'María González López', userEmail: 'maria.gonzalez@gmail.com', date: '05 Feb 2026 09:15', status: 'Resuelta', hasImage: true, imageUri: 'mock', replies: [{ id: '1r', message: 'Se envió oficio a la municipalidad', from: 'admin', date: '06 Feb 2026' }], seenByAdmin: true, seenByUser: true, trackingNumber: 'SOL-FREE-002' }
-            ],
-            documents: [
-                { id: '1', title: 'Acta Reunión Febrero 2026', type: 'Acta', date: '15 Feb 2026', emoji: '📋', folder: 'Actas' },
-                { id: '2', title: 'Reglamento Interno JJVV', type: 'Reglamento', date: '01 Ene 2026', emoji: '📖' },
-                { id: '3', title: 'Balance Financiero 2025', type: 'Finanzas', date: '31 Dic 2025', emoji: '💰' },
-            ],
-            members: [
-                { id: '1', name: 'Javier Aravena Espejo', email: 'javier.aravena25@gmail.com', role: 'Presidente', active: true },
-                { id: '2', name: 'María González López', email: 'maria.gonzalez@gmail.com', role: 'Tesorera', active: true },
-            ],
-            finances: [
-                { id: '1', type: 'income', category: 'Cuotas', description: 'Cuotas Enero 2026', amount: 250000, date: '31 Ene 2026' },
-                { id: '2', type: 'expense', category: 'Mantenimiento', description: 'Reparación luminarias', amount: 85000, date: '15 Feb 2026' },
-                { id: '3', type: 'income', category: 'Cuotas', description: 'Cuotas Febrero 2026', amount: 200000, date: '28 Feb 2026' },
-            ],
-            memberDues: [
-                { id: 'd1', memberId: '1', memberName: 'Javier Aravena Espejo', month: 1, year: 2026, amount: 5000, status: 'paid', paidDate: '15 Ene 2026' },
-                { id: 'd2', memberId: '1', memberName: 'Javier Aravena Espejo', month: 2, year: 2026, amount: 5000, status: 'pending' },
-                { id: 'd3', memberId: '1', memberName: 'Javier Aravena Espejo', month: 3, year: 2026, amount: 5000, status: 'pending' },
-                { id: 'd4', memberId: '1', memberName: 'Javier Aravena Espejo', month: 10, year: 2025, amount: 5000, status: 'overdue' },
-                { id: 'd5', memberId: '1', memberName: 'Javier Aravena Espejo', month: 11, year: 2025, amount: 5000, status: 'paid', paidDate: '10 Nov 2025' },
-                { id: 'd6', memberId: '1', memberName: 'Javier Aravena Espejo', month: 12, year: 2025, amount: 5000, status: 'paid', paidDate: '12 Dic 2025' },
-                { id: 'd7', memberId: '2', memberName: 'María González López', month: 1, year: 2026, amount: 5000, status: 'paid', paidDate: '20 Ene 2026' },
-                { id: 'd8', memberId: '2', memberName: 'María González López', month: 2, year: 2026, amount: 5000, status: 'paid', paidDate: '18 Feb 2026' },
-                { id: 'd9', memberId: '2', memberName: 'María González López', month: 3, year: 2026, amount: 5000, status: 'pending' },
-            ],
+            announcements: [],
+            solicitudes: [],
+            documents: [],
+            members: [],
+            finances: [],
+            memberDues: [],
             seenAvisosCount: 0,
-            seenDocsCount: 3,
+            seenDocsCount: 0,
             polls: [],
             favors: [],
-            events: [
-                { id: '1', title: 'Bingo Vecinal', date: '2026-03-01T18:00', location: 'Sede Vecinal', emoji: '🎲', month: 2 },
-                { id: '2', title: 'Taller de Primeros Auxilios', date: '2026-03-05T10:00', location: 'Plaza Central', emoji: '🏥', month: 2 },
-                { id: '3', title: 'Reunión Ordinaria', date: '2026-03-07T19:00', location: 'Sede Vecinal', emoji: '📋', month: 2 },
-                { id: '4', title: 'Feria Vecinal', date: '2026-04-12T10:00', location: 'Pasaje Los Olivos', emoji: '🛍️', month: 3 },
-                { id: '5', title: 'Día del Niño', date: '2026-04-20T15:00', location: 'Cancha Multiuso', emoji: '🎈', month: 3 },
-                { id: '6', title: 'Asamblea Extraordinaria', date: '2026-05-03T18:30', location: 'Sede Vecinal', emoji: '📢', month: 4 },
-            ],
-            mapPins: [
-                { id: 'pin1', title: 'Sede Vecinal UV 22', description: 'Unidad Vecinal Nº 22, San Miguel', category: 'punto_interes', lat: -33.4920, lng: -70.6610, emoji: '🏛️' },
-                { id: 'pin2', title: 'Plaza del Barrio', description: 'Espacio recreativo', category: 'punto_interes', lat: -33.4905, lng: -70.6625, emoji: '🌳' },
-                { id: 'pin3', title: 'Consultorio', description: 'Centro de salud cercano', category: 'punto_interes', lat: -33.4940, lng: -70.6590, emoji: '🏥' },
-            ],
-            orgSettings: { name: 'JJVV UV 22 San Miguel', address: 'Sede Vecinal UV 22, San Miguel', phone: '', social: '' },
+            events: [],
+            mapPins: [],
+            orgSettings: { name: 'JJVV Mi Barrio', address: '', phone: '', social: '' },
 
             addAnnouncement: (a) => set((state) => ({
                 announcements: [{ ...a, id: Date.now().toString(), date: now(), replies: [] }, ...state.announcements],
@@ -379,9 +345,14 @@ export const useAppStore = create<AppStore>()(
             })),
             setFavors: (favors) => set({ favors }),
             setMapPins: (pins) => set({ mapPins: pins }),
+            setMembers: (members) => set({ members }),
+            setSolicitudes: (solicitudes) => set({ solicitudes }),
+            setAnnouncements: (announcements) => set({ announcements }),
+            setDocuments: (documents) => set({ documents }),
+            setEvents: (events) => set({ events }),
         }),
         {
-            name: 'jjvv-app-storage-v6',
+            name: 'jjvv-app-storage-v7',
             storage: createJSONStorage(() => AsyncStorage),
         }
     )

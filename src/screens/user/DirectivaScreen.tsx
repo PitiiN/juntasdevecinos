@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Image, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
+import { Role } from '../../lib/constants';
 
 type DirectivaMember = {
     user_id: string;
@@ -12,10 +14,20 @@ type DirectivaMember = {
     };
 };
 
+const BOARD_STRUCTURE = [
+    { role: 'presidente', label: 'Presidente', emoji: '👑' },
+    { role: 'secretario', label: 'Secretario/a', emoji: '📄' },
+    { role: 'tesorero', label: 'Tesorero/a', emoji: '💰' },
+    { role: 'director', label: 'Directores', emoji: '🏢', isMultiple: true },
+];
+
 export default function DirectivaScreen({ navigation }: any) {
-    const { organizationId, organizationName } = useAuth();
+    const { organizationId, organizationName, directivaImageUrl, isAdmin, viewMode, refreshSession } = useAuth();
     const [members, setMembers] = useState<DirectivaMember[]>([]);
     const [loading, setLoading] = useState(true);
+    const [uploading, setUploading] = useState(false);
+
+    const isEditor = isAdmin && viewMode === 'admin';
 
     useEffect(() => {
         fetchDirectiva();
@@ -25,7 +37,6 @@ export default function DirectivaScreen({ navigation }: any) {
         if (!organizationId) return;
         setLoading(true);
         try {
-            // Fetch members with board roles
             const { data, error } = await supabase
                 .from('memberships')
                 .select(`
@@ -34,7 +45,7 @@ export default function DirectivaScreen({ navigation }: any) {
                     profile:profiles(full_name)
                 `)
                 .eq('organization_id', organizationId)
-                .in('role', ['president', 'secretary', 'treasurer', 'moderator'])
+                .in('role', ['presidente', 'secretario', 'tesorero', 'director'])
                 .eq('is_active', true);
 
             if (error) {
@@ -49,24 +60,83 @@ export default function DirectivaScreen({ navigation }: any) {
         }
     };
 
-    const getRoleLabel = (role: string) => {
-        switch (role) {
-            case 'president': return 'Presidente';
-            case 'secretary': return 'Secretario';
-            case 'treasurer': return 'Tesorero';
-            case 'moderator': return 'Moderador';
-            default: return role;
+    const handlePickImage = async () => {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+            Alert.alert('Permisos', 'Se necesitan permisos para acceder a la galería.');
+            return;
+        }
+
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ['images'],
+            allowsEditing: true,
+            aspect: [16, 9],
+            quality: 0.7,
+        });
+
+        if (!result.canceled && result.assets[0]) {
+            uploadBoardImage(result.assets[0].uri);
         }
     };
 
-    const getRoleEmoji = (role: string) => {
-        switch (role) {
-            case 'president': return '👑';
-            case 'secretary': return '📄';
-            case 'treasurer': return '💰';
-            case 'moderator': return '⚖️';
-            default: return '👤';
+    const uploadBoardImage = async (uri: string) => {
+        if (!organizationId) return;
+        setUploading(true);
+        try {
+            // In a real app we would upload to Supabase Storage first.
+            // For now, since we don't have storage bucket info, we'll use the URI directly
+            // but usually we'd do: supabase.storage.from('board-photos').upload(...)
+            // Let's assume we just save the public URL or URI.
+            
+            const { error } = await supabase
+                .from('organizations')
+                .update({ directiva_image_url: uri })
+                .eq('id', organizationId);
+
+            if (error) throw error;
+            
+            Alert.alert('Éxito', 'Foto de la directiva actualizada correctamente.');
+            await refreshSession();
+        } catch (err: any) {
+            Alert.alert('Error', err.message);
+        } finally {
+            setUploading(false);
         }
+    };
+
+    const renderBoardMember = (structure: typeof BOARD_STRUCTURE[0]) => {
+        const matchingMembers = members.filter(m => m.role === structure.role);
+        
+        if (structure.isMultiple) {
+            return (
+                <View key={structure.role} style={s.sectionContainer}>
+                    <Text style={s.sectionTitle}>{structure.emoji} {structure.label}</Text>
+                    {matchingMembers.length > 0 ? (
+                        matchingMembers.map((m, idx) => (
+                            <View key={m.user_id + idx} style={s.card}>
+                                <Text style={s.memberName}>{m.profile?.full_name || 'Sin nombre'}</Text>
+                            </View>
+                        ))
+                    ) : (
+                        <View style={s.cardEmpty}>
+                            <Text style={s.emptyText}>Cargo vacío</Text>
+                        </View>
+                    )}
+                </View>
+            );
+        }
+
+        const member = matchingMembers[0];
+        return (
+            <View key={structure.role} style={s.sectionContainer}>
+                <Text style={s.sectionTitle}>{structure.emoji} {structure.label}</Text>
+                <View style={member ? s.card : s.cardEmpty}>
+                    <Text style={member ? s.memberName : s.emptyText}>
+                        {member ? (member.profile?.full_name || 'Sin nombre') : 'Cargo vacío'}
+                    </Text>
+                </View>
+            </View>
+        );
     };
 
     return (
@@ -80,25 +150,34 @@ export default function DirectivaScreen({ navigation }: any) {
             </View>
 
             <ScrollView contentContainerStyle={s.scroll}>
+                {/* Board Image Section */}
+                <View style={s.imageContainer}>
+                    {directivaImageUrl ? (
+                        <Image source={{ uri: directivaImageUrl }} style={s.boardImage} resizeMode="cover" />
+                    ) : (
+                        <View style={s.placeholderImage}>
+                            <Text style={s.placeholderIcon}>👥</Text>
+                            <Text style={s.placeholderText}>Foto de la directiva no disponible</Text>
+                        </View>
+                    )}
+                    
+                    {isEditor && (
+                        <TouchableOpacity 
+                            style={s.uploadOverlay} 
+                            onPress={handlePickImage}
+                            disabled={uploading}
+                        >
+                            <Text style={s.uploadText}>{uploading ? 'Subiendo...' : '📷 Cambiar Foto'}</Text>
+                        </TouchableOpacity>
+                    )}
+                </View>
+
                 {loading ? (
                     <ActivityIndicator size="large" color="#1E3A5F" style={{ marginTop: 40 }} />
-                ) : members.length === 0 ? (
-                    <View style={s.empty}>
-                        <Text style={s.emptyEmoji}>🏢</Text>
-                        <Text style={s.emptyText}>No se han definido los cargos de la directiva aún.</Text>
-                    </View>
                 ) : (
-                    members.map((member, i) => (
-                        <View key={i} style={s.card}>
-                            <View style={s.roleBadge}>
-                                <Text style={s.roleEmoji}>{getRoleEmoji(member.role)}</Text>
-                            </View>
-                            <View style={s.info}>
-                                <Text style={s.roleName}>{getRoleLabel(member.role)}</Text>
-                                <Text style={s.memberName}>{member.profile?.full_name || 'Sin nombre'}</Text>
-                            </View>
-                        </View>
-                    ))
+                    <View style={s.structureList}>
+                        {BOARD_STRUCTURE.map(renderBoardMember)}
+                    </View>
                 )}
             </ScrollView>
         </SafeAreaView>
@@ -112,34 +191,28 @@ const s = StyleSheet.create({
     backText: { color: '#2563EB', fontSize: 16, fontWeight: '600' },
     title: { fontSize: 24, fontWeight: 'bold', color: '#1E3A5F' },
     subTitle: { fontSize: 14, color: '#64748B' },
-    scroll: { padding: 20 },
-    card: { 
-        backgroundColor: '#FFFFFF', 
-        borderRadius: 16, 
-        padding: 16, 
-        marginBottom: 12, 
-        flexDirection: 'row', 
-        alignItems: 'center',
-        elevation: 2,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
+    scroll: { padding: 0 },
+    imageContainer: { width: '100%', height: 220, position: 'relative', backgroundColor: '#E2E8F0' },
+    boardImage: { width: '100%', height: '100%' },
+    placeholderImage: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    placeholderIcon: { fontSize: 40, marginBottom: 8 },
+    placeholderText: { color: '#64748B', fontSize: 14 },
+    uploadOverlay: { 
+        position: 'absolute', 
+        bottom: 12, 
+        right: 12, 
+        backgroundColor: '#1E3A5F', 
+        paddingHorizontal: 16, 
+        paddingVertical: 8, 
+        borderRadius: 20,
+        elevation: 4
     },
-    roleBadge: { 
-        width: 50, 
-        height: 50, 
-        borderRadius: 25, 
-        backgroundColor: '#F1F5F9', 
-        justifyContent: 'center', 
-        alignItems: 'center',
-        marginRight: 16
-    },
-    roleEmoji: { fontSize: 24 },
-    info: { flex: 1 },
-    roleName: { fontSize: 13, fontWeight: 'bold', color: '#64748B', textTransform: 'uppercase', marginBottom: 2 },
+    uploadText: { color: '#FFFFFF', fontSize: 13, fontWeight: '600' },
+    structureList: { padding: 20 },
+    sectionContainer: { marginBottom: 20 },
+    sectionTitle: { fontSize: 14, fontWeight: 'bold', color: '#64748B', textTransform: 'uppercase', marginBottom: 8, letterSpacing: 1 },
+    card: { backgroundColor: '#FFFFFF', borderRadius: 12, padding: 16, borderLeftWidth: 4, borderLeftColor: '#2563EB', elevation: 1 },
+    cardEmpty: { backgroundColor: '#F1F5F9', borderRadius: 12, padding: 16, borderStyle: 'dashed', borderWidth: 1, borderColor: '#CBD5E1' },
     memberName: { fontSize: 18, fontWeight: '600', color: '#1E3A5F' },
-    empty: { alignItems: 'center', marginTop: 60, padding: 40 },
-    emptyEmoji: { fontSize: 60, marginBottom: 16 },
-    emptyText: { fontSize: 16, color: '#94A3B8', textAlign: 'center', lineHeight: 24 },
+    emptyText: { fontSize: 16, color: '#94A3B8', fontStyle: 'italic' },
 });

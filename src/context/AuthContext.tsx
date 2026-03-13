@@ -15,6 +15,7 @@ type AuthContextType = {
     organizationId: string | null;
     organizationName: string | null;
     organizationLogoUrl: string | null;
+    directivaImageUrl: string | null;
     isLoading: boolean;
     isAdmin: boolean;
     viewMode: ViewMode;
@@ -30,6 +31,7 @@ const AuthContext = createContext<AuthContextType>({
     organizationId: null,
     organizationName: null,
     organizationLogoUrl: null,
+    directivaImageUrl: null,
     isLoading: true,
     isAdmin: false,
     viewMode: 'user',
@@ -45,10 +47,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const [organizationId, setOrganizationId] = useState<string | null>(null);
     const [organizationName, setOrganizationName] = useState<string | null>(null);
     const [organizationLogoUrl, setOrganizationLogoUrl] = useState<string | null>(null);
+    const [directivaImageUrl, setDirectivaImageUrl] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [viewMode, setViewMode] = useState<ViewMode>('user');
 
-    const isAdmin = ADMIN_EMAILS.includes(user?.email || '');
+    const isAdmin = user?.email === 'javier.aravena25@gmail.com';
 
     const fetchMembershipData = async (userId: string) => {
         try {
@@ -60,12 +63,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                     organization_id,
                     organizations (
                         name,
-                        logo_url
+                        logo_url,
+                        directiva_image_url
                     )
                 `)
                 .eq('user_id', userId)
-                .eq('is_active', true)
-                .limit(1);
+                .eq('is_active', true);
+                // Removed .limit(1) to support future multi-org for superadmins
 
             if (error) {
                 console.warn('Error fetching membership:', error.message);
@@ -74,15 +78,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                 setOrganizationName(null);
                 setOrganizationLogoUrl(null);
             } else if (data && data.length > 0) {
+                // If superadmin, they might have multiple, but for now we pick the first
+                // or the one specific to javier. 
                 const membership = data[0] as any;
                 setRole(membership.role as Role);
                 setOrganizationId(membership.organization_id);
                 if (membership.organizations) {
                     setOrganizationName(membership.organizations.name);
                     setOrganizationLogoUrl(membership.organizations.logo_url);
+                    setDirectivaImageUrl(membership.organizations.directiva_image_url);
                 } else {
                     setOrganizationName(null);
                     setOrganizationLogoUrl(null);
+                    setDirectivaImageUrl(null);
                 }
             } else {
                 console.log('No membership data found for user:', userId);
@@ -104,10 +112,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
         if (currentSession?.user) {
             await fetchMembershipData(currentSession.user.id);
-            // Auto-set viewMode based on email
-            if (ADMIN_EMAILS.includes(currentSession.user.email || '')) {
-                // Don't auto-switch to admin, let the user choose
-            }
         } else {
             setRole(null);
             setOrganizationId(null);
@@ -149,7 +153,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
 
     return (
-        <AuthContext.Provider value={{ session, user, role, organizationId, organizationName, organizationLogoUrl, isLoading, isAdmin, viewMode, setViewMode, signOut, refreshSession }}>
+        <AuthContext.Provider value={{ session, user, role, organizationId, organizationName, organizationLogoUrl, directivaImageUrl, isLoading, isAdmin, viewMode, setViewMode, signOut, refreshSession }}>
             {children}
         </AuthContext.Provider>
     );

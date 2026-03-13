@@ -7,6 +7,7 @@ import AdminSettingsScreen from '../screens/admin/AdminSettingsScreen';
 import NeighborhoodMapScreen from '../screens/user/NeighborhoodMapScreen';
 import FavoresScreen from '../screens/user/FavoresScreen';
 import EventsScreen from '../screens/user/EventsScreen';
+import DirectivaScreen from '../screens/user/DirectivaScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -20,6 +21,7 @@ export default function AdminMoreStack() {
             <Stack.Screen name="MapaAdmin" component={NeighborhoodMapScreen} />
             <Stack.Screen name="Favores" component={FavoresScreen} />
             <Stack.Screen name="Agenda" component={EventsScreen} />
+            <Stack.Screen name="Directiva" component={DirectivaScreen} />
         </Stack.Navigator>
     );
 }

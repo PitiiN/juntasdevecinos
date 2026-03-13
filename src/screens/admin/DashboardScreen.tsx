@@ -17,11 +17,12 @@ export default function DashboardScreen() {
         { label: 'Avisos', value: announcements.length.toString(), icon: '📢', color: '#F1F5F9', tab: 'Avisos' },
         { label: 'Solicitudes', value: openSolicitudes.toString(), icon: '📝', color: '#FFF7ED', tab: 'Solicitudes' },
         { label: 'Documentos', value: documents.length.toString(), icon: '📁', color: '#F1F5F9', tab: 'Docs' },
-        { label: 'Finanzas', value: '💰', icon: '💰', color: '#FFF7ED', tab: 'Admin', screen: 'AdminFinance' },
-        { label: 'Favores', value: '📌', icon: '📌', color: '#F1F5F9', tab: 'Admin', screen: 'Favores' },
+        { label: 'Finanzas', value: '💸', icon: '💸', color: '#FFF7ED', tab: 'Admin', screen: 'AdminFinance' },
+        { label: 'Favores', value: '🤝', icon: '🤝', color: '#F1F5F9', tab: 'Admin', screen: 'Favores' },
         { label: 'Agenda', value: '📅', icon: '📅', color: '#FFF7ED', tab: 'Admin', screen: 'Agenda' },
         { label: 'Mapa', value: '🗺️', icon: '🗺️', color: '#F1F5F9', tab: 'Admin', screen: 'MapaAdmin' },
-        { label: 'Config', value: '⚙️', icon: '⚙️', color: '#FFF7ED', tab: 'Admin', screen: 'AdminSettings' },
+        { label: 'Directiva', value: '🏢', icon: '🏢', color: '#FFF7ED', tab: 'Admin', screen: 'Directiva' },
+        { label: 'Config', value: '⚙️', icon: '⚙️', color: '#F1F5F9', tab: 'Admin', screen: 'AdminSettings' },
     ];
 
     const handlePress = (stat: typeof stats[0]) => {
