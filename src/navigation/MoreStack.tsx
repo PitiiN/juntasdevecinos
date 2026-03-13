@@ -10,6 +10,7 @@ import DuesScreen from '../screens/user/DuesScreen';
 import ProfileScreen from '../screens/user/ProfileScreen';
 import AccessibilityScreen from '../screens/user/AccessibilityScreen';
 import FavoresScreen from '../screens/user/FavoresScreen';
+import DirectivaScreen from '../screens/user/DirectivaScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -26,6 +27,7 @@ export default function MoreStack() {
             <Stack.Screen name="Profile" component={ProfileScreen} />
             <Stack.Screen name="Accessibility" component={AccessibilityScreen} />
             <Stack.Screen name="Favores" component={FavoresScreen} />
+            <Stack.Screen name="Directiva" component={DirectivaScreen} />
         </Stack.Navigator>
     );
 }

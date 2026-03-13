@@ -21,6 +21,48 @@ export default function ProfileScreen({ navigation }: any) {
     const [confirmPassword, setConfirmPassword] = useState('');
     const [passwordLoading, setPasswordLoading] = useState(false);
 
+    // Address modal
+    const [showAddressModal, setShowAddressModal] = useState(false);
+    const [address, setAddress] = useState('');
+    const [addressLoading, setAddressLoading] = useState(false);
+
+    React.useEffect(() => {
+        fetchProfile();
+    }, [user]);
+
+    const fetchProfile = async () => {
+        if (!user) return;
+        try {
+            const { data, error } = await supabase.from('profiles').select('address').eq('user_id', user.id).single();
+            if (data) setAddress(data.address || '');
+            if (error && error.code !== 'PGRST116') console.warn('Error fetching profile:', error);
+        } catch (err) {
+            console.error('Fetch profile err:', err);
+        }
+    };
+
+    const handleSaveAddress = async () => {
+        if (!user) return;
+        setAddressLoading(true);
+        try {
+            const { error } = await supabase
+                .from('profiles')
+                .update({ address: address.trim() })
+                .eq('user_id', user.id);
+            
+            if (error) {
+                Alert.alert('Error', error.message);
+            } else {
+                Alert.alert('✅ Dirección actualizada', 'Tu dirección ha sido guardada exitosamente.');
+                setShowAddressModal(false);
+            }
+        } catch (err: any) {
+            Alert.alert('Error', err.message || 'Error inesperado');
+        } finally {
+            setAddressLoading(false);
+        }
+    };
+
     const handleChangeEmail = async () => {
         if (!newEmail.trim() || !newEmail.includes('@')) {
             Alert.alert('Error', 'Ingresa un correo electrónico válido.');
@@ -84,6 +126,16 @@ export default function ProfileScreen({ navigation }: any) {
                     <Text style={s.value}>{fullName}</Text>
                 </View>
 
+                <TouchableOpacity style={s.card} onPress={() => setShowAddressModal(true)}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <View style={{ flex: 1 }}>
+                            <Text style={s.label}>Dirección</Text>
+                            <Text style={s.value}>{address || 'No especificada (Toca para editar)'}</Text>
+                        </View>
+                        <Text style={{ fontSize: 18 }}>✏️</Text>
+                    </View>
+                </TouchableOpacity>
+
                 <View style={s.card}>
                     <Text style={s.label}>Miembro desde</Text>
                     <Text style={s.value}>{createdAt}</Text>
@@ -101,6 +153,29 @@ export default function ProfileScreen({ navigation }: any) {
                 <TouchableOpacity style={s.resetBtn} onPress={() => setShowPasswordModal(true)}>
                     <Text style={s.resetText}>🔑 Cambiar Contraseña</Text>
                 </TouchableOpacity>
+
+                {/* Address Modal */}
+                <Modal visible={showAddressModal} transparent animationType="fade">
+                    <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => setShowAddressModal(false)}>
+                        <View style={s.modalContent} onStartShouldSetResponder={() => true}>
+                            <Text style={s.modalTitle}>Editar Dirección</Text>
+                            <Text style={s.modalSub}>Ingresa tu dirección particular</Text>
+                            <TextInput
+                                style={s.input}
+                                placeholder="Ej: Calle Siempre Viva 123"
+                                placeholderTextColor="#94A3B8"
+                                value={address}
+                                onChangeText={setAddress}
+                            />
+                            <TouchableOpacity style={[s.confirmBtn, addressLoading && { opacity: 0.6 }]} onPress={handleSaveAddress} disabled={addressLoading}>
+                                <Text style={s.confirmText}>{addressLoading ? 'Guardando...' : 'Guardar dirección'}</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => setShowAddressModal(false)} style={s.cancelBtn}>
+                                <Text style={s.cancelText}>Cancelar</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </TouchableOpacity>
+                </Modal>
 
                 {/* Email Modal */}
                 <Modal visible={showEmailModal} transparent animationType="fade">

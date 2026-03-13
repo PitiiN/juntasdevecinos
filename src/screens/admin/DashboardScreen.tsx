@@ -1,25 +1,27 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useAppStore } from '../../lib/store';
+import { useAuth } from '../../context/AuthContext';
 
 export default function DashboardScreen() {
     const navigation = useNavigation<any>();
+    const { organizationLogoUrl, organizationName } = useAuth();
     const { announcements, solicitudes, documents, members } = useAppStore();
 
     const openSolicitudes = solicitudes.filter(s => s.status === 'Abierta').length;
 
     const stats = [
-        { label: 'Socios', value: members.length.toString(), icon: '👥', color: '#EFF6FF', tab: 'Admin', screen: 'ManageMembers' },
-        { label: 'Avisos', value: announcements.length.toString(), icon: '📢', color: '#F0FDF4', tab: 'Avisos' },
-        { label: 'Solicitudes', value: openSolicitudes.toString(), icon: '📝', color: '#FEF2F2', tab: 'Solicitudes' },
-        { label: 'Documentos', value: documents.length.toString(), icon: '📁', color: '#FFFBEB', tab: 'Docs' },
-        { label: 'Finanzas', value: '💰', icon: '💰', color: '#F0FDF4', tab: 'Admin', screen: 'AdminFinance' },
-        { label: 'Favores', value: '📌', icon: '📌', color: '#FFF7ED', tab: 'Admin', screen: 'Favores' },
-        { label: 'Agenda', value: '📅', icon: '📅', color: '#F5F3FF', tab: 'Admin', screen: 'Agenda' },
-        { label: 'Mapa', value: '🗺️', icon: '🗺️', color: '#EFF6FF', tab: 'Admin', screen: 'MapaAdmin' },
-        { label: 'Config', value: '⚙️', icon: '⚙️', color: '#F1F5F9', tab: 'Admin', screen: 'AdminSettings' },
+        { label: 'Socios', value: members.length.toString(), icon: '👥', color: '#FFF7ED', tab: 'Admin', screen: 'ManageMembers' },
+        { label: 'Avisos', value: announcements.length.toString(), icon: '📢', color: '#F1F5F9', tab: 'Avisos' },
+        { label: 'Solicitudes', value: openSolicitudes.toString(), icon: '📝', color: '#FFF7ED', tab: 'Solicitudes' },
+        { label: 'Documentos', value: documents.length.toString(), icon: '📁', color: '#F1F5F9', tab: 'Docs' },
+        { label: 'Finanzas', value: '💰', icon: '💰', color: '#FFF7ED', tab: 'Admin', screen: 'AdminFinance' },
+        { label: 'Favores', value: '📌', icon: '📌', color: '#F1F5F9', tab: 'Admin', screen: 'Favores' },
+        { label: 'Agenda', value: '📅', icon: '📅', color: '#FFF7ED', tab: 'Admin', screen: 'Agenda' },
+        { label: 'Mapa', value: '🗺️', icon: '🗺️', color: '#F1F5F9', tab: 'Admin', screen: 'MapaAdmin' },
+        { label: 'Config', value: '⚙️', icon: '⚙️', color: '#FFF7ED', tab: 'Admin', screen: 'AdminSettings' },
     ];
 
     const handlePress = (stat: typeof stats[0]) => {
@@ -58,6 +60,7 @@ const s = StyleSheet.create({
     header: { backgroundColor: '#1E3A5F', borderRadius: 16, padding: 14, marginBottom: 20 },
     headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#FFFFFF' },
     headerSub: { fontSize: 13, color: '#94A3B8', marginTop: 2 },
+    logo: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#FFFFFF', marginLeft: 10 },
     section: { fontSize: 18, fontWeight: 'bold', color: '#334155', marginBottom: 12 },
     grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 24 },
     card: { width: '31%', borderRadius: 14, paddingVertical: 14, paddingHorizontal: 6, alignItems: 'center', marginBottom: 10, elevation: 2 },

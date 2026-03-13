@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export type AnnouncementReply = {
     id: string; message: string; userName: string; date: string;
+    from: 'admin' | 'user';
     mediaUrl?: string; mediaType?: 'image' | 'video' | 'audio';
 };
 
@@ -101,7 +102,7 @@ type AppStore = {
     addAnnouncement: (a: Omit<Announcement, 'id' | 'date' | 'replies'>) => void;
     updateAnnouncement: (id: string, updates: Partial<Announcement>) => void;
     removeAnnouncement: (id: string) => void;
-    addAnnouncementReply: (announcementId: string, message: string, userName: string, mediaUrl?: string, mediaType?: 'image' | 'video' | 'audio') => void;
+    addAnnouncementReply: (announcementId: string, message: string, userName: string, from: 'admin' | 'user', mediaUrl?: string, mediaType?: 'image' | 'video' | 'audio') => void;
 
     addPoll: (p: Omit<Poll, 'id' | 'date' | 'votedBy'>) => void;
     votePoll: (pollId: string, optionId: string, userId: string) => void;
@@ -134,6 +135,7 @@ type AppStore = {
     updateMapPin: (id: string, updates: Partial<MapPin>) => void;
     addMapPinReview: (pinId: string, review: Omit<MapPinReview, 'id' | 'date'>) => void;
     updateOrgSettings: (s: Partial<OrgSettings>) => void;
+    setFavors: (favors: Favor[]) => void;
 };
 
 const now = () => new Date().toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -203,10 +205,10 @@ export const useAppStore = create<AppStore>()(
             removeAnnouncement: (id) => set((state) => ({
                 announcements: state.announcements.filter(a => a.id !== id),
             })),
-            addAnnouncementReply: (announcementId, message, userName, mediaUrl, mediaType) => set((state) => ({
+            addAnnouncementReply: (announcementId, message, userName, from, mediaUrl, mediaType) => set((state) => ({
                 announcements: state.announcements.map(a => a.id === announcementId ? {
                     ...a,
-                    replies: [...(a.replies || []), { id: Date.now().toString(), message, userName, date: now(), mediaUrl, mediaType }]
+                    replies: [...(a.replies || []), { id: Date.now().toString(), message, userName, from, date: now(), mediaUrl, mediaType }]
                 } : a),
             })),
 
@@ -310,6 +312,7 @@ export const useAppStore = create<AppStore>()(
             updateOrgSettings: (s) => set((state) => ({
                 orgSettings: { ...state.orgSettings, ...s },
             })),
+            setFavors: (favors) => set({ favors }),
         }),
         {
             name: 'jjvv-app-storage-v6',

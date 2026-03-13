@@ -46,6 +46,13 @@ export default function ManageAnnouncementsScreen() {
     const [showHistoricPolls, setShowHistoricPolls] = useState(false);
 
     const isExpiredAviso = (a: any) => {
+        const publishedAt = a.date ? new Date(a.date) : new Date();
+        const oneMonthAgo = new Date();
+        oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+
+        // 1-month rule: if older than 30 days
+        if (publishedAt < oneMonthAgo) return true;
+
         if (!a.expiresAt) return false;
         return new Date() > new Date(a.expiresAt);
     };

@@ -13,6 +13,8 @@ type AuthContextType = {
     user: User | null;
     role: Role | null;
     organizationId: string | null;
+    organizationName: string | null;
+    organizationLogoUrl: string | null;
     isLoading: boolean;
     isAdmin: boolean;
     viewMode: ViewMode;
@@ -26,6 +28,8 @@ const AuthContext = createContext<AuthContextType>({
     user: null,
     role: null,
     organizationId: null,
+    organizationName: null,
+    organizationLogoUrl: null,
     isLoading: true,
     isAdmin: false,
     viewMode: 'user',
@@ -39,6 +43,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
     const [role, setRole] = useState<Role | null>(null);
     const [organizationId, setOrganizationId] = useState<string | null>(null);
+    const [organizationName, setOrganizationName] = useState<string | null>(null);
+    const [organizationLogoUrl, setOrganizationLogoUrl] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [viewMode, setViewMode] = useState<ViewMode>('user');
 
@@ -46,20 +52,44 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     const fetchMembershipData = async (userId: string) => {
         try {
+            // Fetch membership with organization details joined
             const { data, error } = await supabase
                 .from('memberships')
-                .select('role, organization_id')
+                .select(`
+                    role, 
+                    organization_id,
+                    organizations (
+                        name,
+                        logo_url
+                    )
+                `)
                 .eq('user_id', userId)
                 .eq('is_active', true)
-                .maybeSingle();
+                .limit(1);
 
             if (error) {
-                console.warn('No membership found:', error.message);
+                console.warn('Error fetching membership:', error.message);
                 setRole(null);
                 setOrganizationId(null);
-            } else if (data) {
-                setRole(data.role as Role);
-                setOrganizationId(data.organization_id);
+                setOrganizationName(null);
+                setOrganizationLogoUrl(null);
+            } else if (data && data.length > 0) {
+                const membership = data[0] as any;
+                setRole(membership.role as Role);
+                setOrganizationId(membership.organization_id);
+                if (membership.organizations) {
+                    setOrganizationName(membership.organizations.name);
+                    setOrganizationLogoUrl(membership.organizations.logo_url);
+                } else {
+                    setOrganizationName(null);
+                    setOrganizationLogoUrl(null);
+                }
+            } else {
+                console.log('No membership data found for user:', userId);
+                setRole(null);
+                setOrganizationId(null);
+                setOrganizationName(null);
+                setOrganizationLogoUrl(null);
             }
         } catch (err) {
             console.error('Unexpected error fetching membership:', err);
@@ -119,7 +149,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
 
     return (
-        <AuthContext.Provider value={{ session, user, role, organizationId, isLoading, isAdmin, viewMode, setViewMode, signOut, refreshSession }}>
+        <AuthContext.Provider value={{ session, user, role, organizationId, organizationName, organizationLogoUrl, isLoading, isAdmin, viewMode, setViewMode, signOut, refreshSession }}>
             {children}
         </AuthContext.Provider>
     );

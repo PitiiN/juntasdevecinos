@@ -86,7 +86,8 @@ export default function AnnouncementsScreen() {
     const handleSendReply = (id: string) => {
         if (!replyMessage.trim() && !selectedMedia) return;
         const userName = user?.user_metadata?.full_name || 'Vecino';
-        addAnnouncementReply(id, replyMessage, userName, selectedMedia?.uri, selectedMedia?.type);
+        const from = user?.app_metadata?.role === 'admin' || user?.user_metadata?.role === 'admin' ? 'admin' : 'user';
+        addAnnouncementReply(id, replyMessage, userName, from, selectedMedia?.uri, selectedMedia?.type);
         setReplyMessage('');
         setSelectedMedia(null);
         setReplyingTo(null);
@@ -227,6 +228,13 @@ export default function AnnouncementsScreen() {
 
     // Expiry helpers
     const isExpiredAviso = (a: any) => {
+        const publishedAt = a.date ? new Date(a.date) : new Date();
+        const oneMonthAgo = new Date();
+        oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+        
+        // 1-month rule: if older than 30 days
+        if (publishedAt < oneMonthAgo) return true;
+
         if (!a.expiresAt) return false; // null/undefined = "No aplica"
         return new Date() > new Date(a.expiresAt);
     };
@@ -603,6 +611,7 @@ const s = StyleSheet.create({
     expandBtnText: { color: '#2563EB', fontSize: 14, fontWeight: '600' },
     repliesContainer: { marginTop: 8, borderTopWidth: 1, borderTopColor: '#E2E8F0', paddingTop: 12 },
     replyBubble: { backgroundColor: '#F8FAFC', padding: 10, borderRadius: 12, marginBottom: 8 },
+    replyBubbleAdmin: { backgroundColor: '#FFFBEB', borderColor: '#FEF3C7', borderWidth: 1 },
     replyHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
     replyName: { fontSize: 12, fontWeight: '600', color: '#334155' },
     replyDate: { fontSize: 11, color: '#94A3B8' },

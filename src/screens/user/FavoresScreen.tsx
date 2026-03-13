@@ -3,40 +3,99 @@ import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, Alert 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppStore } from '../../lib/store';
 import { useAuth } from '../../context/AuthContext';
+import { favorService } from '../../services/favorService';
 
 const POSTIT_COLORS = ['#FEF3C7', '#DBEAFE', '#D1FAE5', '#FCE7F3'];
 
 export default function FavoresScreen({ navigation }: any) {
     const favors = useAppStore(s => s.favors);
-    const { addFavor, updateFavor, removeFavor } = useAppStore();
-    const { user } = useAuth();
+    const { setFavors } = useAppStore();
+    const { user, organizationId } = useAuth();
 
     const [showForm, setShowForm] = useState(false);
     const [editId, setEditId] = useState<string | null>(null);
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+
+    const loadFavors = async () => {
+        if (!organizationId) return;
+        setIsLoading(true);
+        try {
+            const data = await favorService.getFavors(organizationId);
+            setFavors(data);
+        } catch (error) {
+            console.error('Error loading favors:', error);
+            Alert.alert('Error', 'No se pudieron cargar los favores');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    React.useEffect(() => {
+        loadFavors();
+    }, [organizationId]);
+
+    // Realtime subscription
+    React.useEffect(() => {
+        if (!organizationId) return;
+        
+        const subscription = favorService.subscribeToFavors(organizationId, () => {
+            loadFavors();
+        });
+
+        return () => {
+            subscription.unsubscribe();
+        };
+    }, [organizationId]);
 
     const activeFavors = favors.filter(f => !f.resolved);
 
-    const handleSave = () => {
+    const handleSave = async () => {
+        console.log('DEBUG [FavoresScreen]: user:', user?.email, 'orgId:', organizationId);
+
         if (!title.trim() || !description.trim()) {
             Alert.alert('Error', 'Completa título y descripción');
             return;
         }
 
-        const authorName = user?.user_metadata?.full_name || 'Vecino';
-        const userEmail = user?.email || 'desconocido';
-
-        if (editId) {
-            updateFavor(editId, { title, description });
-            Alert.alert('✅ Favor actualizado');
-        } else {
-            addFavor({ title, description, author: authorName, userEmail });
-            Alert.alert('✅ Favor publicado');
+        if (!user) {
+            Alert.alert('Error', 'No se pudo identificar al usuario. Por favor, re-inicia sesión.');
+            return;
         }
 
-        setShowForm(false); setEditId(null);
-        setTitle(''); setDescription('');
+        if (!organizationId) {
+            // Try to find an organization if it's missing but we have a user
+            Alert.alert('Error', 'No se pudo identificar tu organización/comunidad. Verifica tu perfil.');
+            return;
+        }
+
+        setIsLoading(true);
+        try {
+            if (editId) {
+                await favorService.updateFavor(editId, { title, description });
+                Alert.alert('✅ Favor actualizado');
+            } else {
+                const authorName = user?.user_metadata?.full_name || 'Vecino';
+                await favorService.createFavor({
+                    title,
+                    description,
+                    author: authorName,
+                    userEmail: user.email || 'desconocido',
+                    organization_id: organizationId,
+                    user_id: user.id
+                });
+                Alert.alert('✅ Favor publicado');
+            }
+            await loadFavors();
+            setShowForm(false); setEditId(null);
+            setTitle(''); setDescription('');
+        } catch (error) {
+            console.error('Error saving favor:', error);
+            Alert.alert('Error', 'No se pudo guardar el favor');
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const startEdit = (f: any) => {
@@ -51,13 +110,26 @@ export default function FavoresScreen({ navigation }: any) {
         setShowForm(true);
     };
 
-    const handleDelete = (id: string, isAuthor: boolean) => {
+    const handleDelete = (id: string) => {
         Alert.alert(
             '🗑️ Eliminar Favor',
             `¿Estás seguro? Esta acción no se puede deshacer.`,
             [
                 { text: 'Cancelar', style: 'cancel' },
-                { text: 'Sí, eliminar', style: 'destructive', onPress: () => removeFavor(id) }
+                {
+                    text: 'Sí, eliminar', style: 'destructive', onPress: async () => {
+                        setIsLoading(true);
+                        try {
+                            await favorService.deleteFavor(id);
+                            await loadFavors();
+                        } catch (error) {
+                            console.error('Error deleting favor:', error);
+                            Alert.alert('Error', 'No se pudo eliminar el favor');
+                        } finally {
+                            setIsLoading(false);
+                        }
+                    }
+                }
             ]
         );
     };
@@ -68,7 +140,20 @@ export default function FavoresScreen({ navigation }: any) {
             `¿Estás seguro que el favor "${title}" ya fue resuelto? Desaparecerá del tablón activo.`,
             [
                 { text: 'Cancelar', style: 'cancel' },
-                { text: 'Sí, Resuelto', onPress: () => updateFavor(id, { resolved: true }) }
+                {
+                    text: 'Sí, Resuelto', onPress: async () => {
+                        setIsLoading(true);
+                        try {
+                            await favorService.updateFavor(id, { resolved: true });
+                            await loadFavors();
+                        } catch (error) {
+                            console.error('Error resolving favor:', error);
+                            Alert.alert('Error', 'No se pudo marcar como resuelto');
+                        } finally {
+                            setIsLoading(false);
+                        }
+                    }
+                }
             ]
         );
     };
@@ -93,7 +178,7 @@ export default function FavoresScreen({ navigation }: any) {
                 {isMine && (
                     <View style={s.ownerActions}>
                         <TouchableOpacity style={s.actionBtnText} onPress={() => startEdit(f)}><Text>✏️</Text></TouchableOpacity>
-                        <TouchableOpacity style={s.actionBtnText} onPress={() => handleDelete(f.id, true)}><Text>🗑️</Text></TouchableOpacity>
+                        <TouchableOpacity style={s.actionBtnText} onPress={() => handleDelete(f.id)}><Text>🗑️</Text></TouchableOpacity>
                         <TouchableOpacity style={s.resolveBtn} onPress={() => markResolved(f.id, f.title)}>
                             <Text style={s.resolveText}>✅ Resuelto</Text>
                         </TouchableOpacity>
