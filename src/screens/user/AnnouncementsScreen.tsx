@@ -12,7 +12,6 @@ import { useAccessibility } from '../../context/AccessibilityContext';
 
 export default function AnnouncementsScreen() {
     const route = useRoute<any>();
-    const [tab, setTab] = useState<'avisos' | 'encuestas'>(route.params?.initialTab || 'avisos');
     const [speaking, setSpeaking] = useState<string | null>(null);
     const [replyingTo, setReplyingTo] = useState<string | null>(null);
     const [expandedThreads, setExpandedThreads] = useState<Record<string, boolean>>({});
@@ -28,23 +27,10 @@ export default function AnnouncementsScreen() {
         audioPlayerRef.current = audioPlayer;
     }, [audioPlayer]);
 
-    // Stop audio when switching tabs
-    useEffect(() => {
-        if (audioPlayerRef.current) {
-            audioPlayerRef.current.stopAsync();
-            audioPlayerRef.current.unloadAsync();
-            setAudioPlayer(null);
-            setPlayingAudioId(null);
-        }
-        Speech.stop();
-        setSpeaking(null);
-    }, [tab]);
 
     const announcements = useAppStore(s => s.announcements);
-    const polls = useAppStore(s => s.polls);
     const markAvisosSeen = useAppStore(s => s.markAvisosSeen);
     const addAnnouncementReply = useAppStore(s => s.addAnnouncementReply);
-    const votePoll = useAppStore(s => s.votePoll);
     const { ttsEnabled } = useAccessibility();
     const { user } = useAuth();
 
@@ -244,89 +230,13 @@ export default function AnnouncementsScreen() {
     const importantAvisos = activeAnnouncements.filter(a => a.priority === 'important');
     const normalAvisos = activeAnnouncements.filter(a => a.priority === 'normal');
 
-    // Filter non-expired polls for users
-    const activePolls = polls.filter(p => {
-        const isPollExpired = new Date() > new Date(p.deadline);
-        return !isPollExpired;
-    });
-
     return (
         <SafeAreaView style={s.safe}>
-            <View style={s.tabs}>
-                <TouchableOpacity style={[s.tab, tab === 'avisos' && s.tabActive]} onPress={() => setTab('avisos')}>
-                    <Text style={[s.tabText, tab === 'avisos' && s.tabTextActive]}>📢 Avisos</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={[s.tab, tab === 'encuestas' && s.tabActive]} onPress={() => setTab('encuestas')}>
-                    <Text style={[s.tabText, tab === 'encuestas' && s.tabTextActive]}>📊 Encuestas</Text>
-                </TouchableOpacity>
+            <View style={s.header}>
+                <Text style={s.title}>📢 Avisos</Text>
             </View>
-
             <ScrollView contentContainerStyle={s.scroll}>
-                {tab === 'encuestas' && (
-                    activePolls.length === 0 ? (
-                        <View style={s.empty}><Text style={s.emptyText}>No hay encuestas activas</Text></View>
-                    ) : activePolls.map(p => {
-                        const isExpired = new Date() > new Date(p.deadline);
-                        // Determine user's current vote. Fallback to backward-compatible votedBy array if userVotes is missing.
-                        const userVotesMap = (p as any).userVotes || {};
-                        const userVotedOptionId = userVotesMap[user?.id || ''];
-                        const hasVoted = !!userVotedOptionId || p.votedBy.includes(user?.id || '');
-                        const showResults = isExpired || hasVoted;
-                        const totalVotes = p.options.reduce((sum, opt) => sum + opt.votes, 0);
-
-                        return (
-                            <View key={p.id} style={[s.card, { borderLeftColor: '#3B82F6' }]}>
-                                <View style={s.row}>
-                                    <Text style={s.pollTitle}>📊 {p.question}</Text>
-                                </View>
-                                {isExpired ? (
-                                    <View style={s.expiredBanner}><Text style={s.expiredText}>⏱️ Esta encuesta ha finalizado.</Text></View>
-                                ) : (
-                                    <Text style={s.metaText}>Cierra: {p.deadline}</Text>
-                                )}
-
-                                <View style={s.pollOptions}>
-                                    {p.options.map(opt => {
-                                        const percentage = totalVotes > 0 ? Math.round((opt.votes / totalVotes) * 100) : 0;
-                                        const isMyVote = userVotedOptionId === opt.id;
-
-                                        if (showResults && isExpired) {
-                                            return (
-                                                <View key={opt.id} style={[s.pollResultBox, isMyVote && s.pollResultBoxMyVote]}>
-                                                    <View style={[s.pollResultFill, { width: `${percentage}%` }]} />
-                                                    <View style={s.pollResultContent}>
-                                                        <Text style={s.pollResultText}>{opt.text} {isMyVote ? '(Tu voto)' : ''}</Text>
-                                                        <Text style={s.pollResultStat}>{percentage}% ({opt.votes})</Text>
-                                                    </View>
-                                                </View>
-                                            );
-                                        }
-
-                                        return (
-                                            <TouchableOpacity
-                                                key={opt.id}
-                                                style={[s.pollOptionBtn, isMyVote && s.pollOptionBtnSelected]}
-                                                onPress={() => user?.id && votePoll(p.id, opt.id, user.id)}
-                                            >
-                                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '100%' }}>
-                                                    <Text style={[s.pollOptionText, isMyVote && s.pollOptionTextSelected]}>{opt.text}</Text>
-                                                    {showResults && <Text style={[s.pollOptionText, isMyVote && s.pollOptionTextSelected]}>{percentage}%</Text>}
-                                                </View>
-                                                {showResults && (
-                                                    <View style={[s.pollResultFillBg, { width: `${percentage}%` }]} />
-                                                )}
-                                            </TouchableOpacity>
-                                        );
-                                    })}
-                                </View>
-                                <Text style={s.pollFooter}>{totalVotes} voto{totalVotes !== 1 ? 's' : ''} en total{(hasVoted && !isExpired) ? ' • Puedes cambiar tu voto' : ''}</Text>
-                            </View>
-                        );
-                    })
-                )}
-
-                {tab === 'avisos' && (
-                    activeAnnouncements.length === 0 ? (
+                {activeAnnouncements.length === 0 ? (
                         <View style={s.empty}><Text style={s.emptyText}>No hay avisos por el momento</Text></View>
                     ) : (
                         <>
@@ -547,8 +457,7 @@ export default function AnnouncementsScreen() {
                                 )
                             })}
                         </>
-                    )
-                )}
+                    )}
             </ScrollView>
 
             {viewingMedia && (
@@ -576,9 +485,10 @@ export default function AnnouncementsScreen() {
 }
 
 const s = StyleSheet.create({
-    safe: { flex: 1, backgroundColor: 'transparent' },
+    safe: { flex: 1, backgroundColor: '#F8FAFC' },
     scroll: { padding: 20 },
-    title: { fontSize: 24, fontWeight: 'bold', color: '#1E3A5F', marginBottom: 16 },
+    header: { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 15, backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#E2E8F0' },
+    title: { fontSize: 24, fontWeight: 'bold', color: '#1E3A5F' },
     card: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, marginBottom: 12, borderLeftWidth: 4, elevation: 2 },
     row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
     cardTitle: { fontSize: 16, fontWeight: 'bold', color: '#0F172A', flex: 1 },

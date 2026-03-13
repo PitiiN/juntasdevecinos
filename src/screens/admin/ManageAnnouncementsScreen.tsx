@@ -30,6 +30,7 @@ export default function ManageAnnouncementsScreen() {
     const [pollQuestion, setPollQuestion] = useState('');
     const [pollOptions, setPollOptions] = useState<string[]>(['', '']);
     const [pollDeadline, setPollDeadline] = useState('');
+    const [allowMultiple, setAllowMultiple] = useState(false);
     const [showDatePicker, setShowDatePicker] = useState(false);
 
     const [sendPush, setSendPush] = useState(false);
@@ -91,6 +92,7 @@ export default function ManageAnnouncementsScreen() {
                 question: pollQuestion,
                 deadline: pollDeadline,
                 options: validOptions.map(text => ({ id: Math.random().toString(), text, votes: 0 })),
+                allowMultiple,
                 pushEnabled: sendPush
             });
             if (sendPush) await pushService.broadcastPushNotification(`📊 Nueva Encuesta`, pollQuestion, { type: 'poll' });
@@ -108,7 +110,7 @@ export default function ManageAnnouncementsScreen() {
 
     const cancelForm = () => {
         setShowForm(false); setEditId(null); setTitle(''); setBody(''); setLocation(''); setSchedule(''); setPriority('normal');
-        setPollQuestion(''); setPollOptions(['', '']); setPollDeadline('');
+        setPollQuestion(''); setPollOptions(['', '']); setPollDeadline(''); setAllowMultiple(false);
         setSendPush(false); setNoExpiry(true); setExpiresAtDate(null);
     };
 
@@ -260,6 +262,11 @@ export default function ManageAnnouncementsScreen() {
                                 <TouchableOpacity onPress={() => setPollOptions([...pollOptions, ''])}>
                                     <Text style={{ color: '#2563EB', fontWeight: 'bold', marginTop: 4 }}>+ Añadir opción</Text>
                                 </TouchableOpacity>
+
+                                <View style={s.pushToggleRow}>
+                                    <Text style={s.pushToggleLabel}>✅ Permitir múltiples respuestas</Text>
+                                    <Switch value={allowMultiple} onValueChange={setAllowMultiple} trackColor={{ false: '#CBD5E1', true: '#22C55E' }} thumbColor="#FFFFFF" />
+                                </View>
                             </>
                         )}
 

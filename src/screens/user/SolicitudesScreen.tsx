@@ -5,7 +5,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../context/AuthContext';
 import { useAppStore } from '../../lib/store';
 
-const CATEGORIES = ['Accidente', 'Certificado de Residencia', 'Nuevo Servicio/Oficio/Emprendimiento', 'Otro'];
+const CATEGORIES = ['Certificado de Residencia', 'Áreas Verdes', 'Nuevo', 'Servicio/Oficio/Emprendimiento', 'Otros'];
 
 export default function SolicitudesScreen({ navigation }: any) {
     const { user } = useAuth();

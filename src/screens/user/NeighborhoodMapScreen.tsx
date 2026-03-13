@@ -1,20 +1,19 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, Modal, ScrollView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MapView, { Marker } from 'react-native-maps';
+import { useFocusEffect } from '@react-navigation/native';
 import { useAppStore, MapPin } from '../../lib/store';
 import { useAuth } from '../../context/AuthContext';
+import { poiService } from '../../services/poiService';
 
 const SERVICE_SUBCATEGORIES = ['Salud', 'Deporte', 'Servicios para el hogar', 'Comida', 'Otro'];
 
 export default function NeighborhoodMapScreen({ navigation }: any) {
-    const { isAdmin, viewMode, user } = useAuth();
-    const mapPins = useAppStore(s => s.mapPins);
-    const addMapPin = useAppStore(s => s.addMapPin);
-    const removeMapPin = useAppStore(s => s.removeMapPin);
-    const updateMapPin = useAppStore(s => s.updateMapPin);
-    const addMapPinReview = useAppStore(s => s.addMapPinReview);
-    const addSolicitud = useAppStore(s => s.addSolicitud);
+    const { isAdmin, viewMode, user, organizationId } = useAuth();
+    const { mapPins, setMapPins, addMapPin, removeMapPin, updateMapPin, addMapPinReview, addSolicitud } = useAppStore();
+    const mapRef = useRef<MapView>(null);
+    const [isLoading, setIsLoading] = useState(false);
 
     // Modals
     const [showAddModal, setShowAddModal] = useState(false);
@@ -40,6 +39,51 @@ export default function NeighborhoodMapScreen({ navigation }: any) {
     const [tappedLat, setTappedLat] = useState<number | null>(null);
     const [tappedLng, setTappedLng] = useState<number | null>(null);
     const [editingPinId, setEditingPinId] = useState<string | null>(null);
+
+    const loadPins = async () => {
+        if (!organizationId) return;
+        setIsLoading(true);
+        try {
+            const data = await poiService.getPois(organizationId);
+            // Map DB fields to Store MapPin type
+            const mapped = data.map((p: any) => ({
+                id: p.id,
+                title: p.name,
+                description: p.description,
+                category: p.category,
+                lat: p.latitude,
+                lng: p.longitude,
+                emoji: p.emoji || '📍',
+                subcategory: p.subcategory,
+                contactWhatsapp: p.contact_whatsapp,
+                socialInstagram: p.social_instagram,
+                socialFacebook: p.social_facebook,
+                reviews: p.reviews || []
+            }));
+            setMapPins(mapped);
+        } catch (error) {
+            console.error('Error loading pins:', error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    React.useEffect(() => {
+        loadPins();
+    }, [organizationId]);
+
+    useFocusEffect(
+        useCallback(() => {
+            if (mapRef.current) {
+                mapRef.current.animateToRegion({
+                    latitude: -33.48942,
+                    longitude: -70.6567,
+                    latitudeDelta: 0.005,
+                    longitudeDelta: 0.005,
+                }, 1000);
+            }
+        }, [])
+    );
 
     const isActualAdmin = isAdmin && viewMode === 'admin';
 
@@ -71,7 +115,7 @@ export default function NeighborhoodMapScreen({ navigation }: any) {
         setShowAddModal(true);
     };
 
-    const handleAddPin = () => {
+    const handleAddPin = async () => {
         if (!pinTitle.trim()) { Alert.alert('Error', 'Ingresa un nombre para el pin.'); return; }
         if (tappedLat === null || tappedLng === null) { Alert.alert('Error', 'Selecciona una ubicación tocando el mapa.'); return; }
 
@@ -89,17 +133,41 @@ export default function NeighborhoodMapScreen({ navigation }: any) {
         }
 
         if (isActualAdmin) {
-            if (editingPinId) {
-                updateMapPin(editingPinId, pinData);
-                Alert.alert('✅ Pin actualizado', `"${pinTitle.trim()}" ha sido actualizado.`);
-            } else {
-                addMapPin(pinData);
-                Alert.alert('✅ Pin agregado', `"${pinTitle.trim()}" ha sido agregado al mapa.`);
+            setIsLoading(true);
+            try {
+                const dbData = {
+                    organization_id: organizationId,
+                    name: pinData.title,
+                    description: pinData.description,
+                    category: pinData.category,
+                    latitude: pinData.lat,
+                    longitude: pinData.lng,
+                    emoji: pinData.emoji,
+                    subcategory: pinData.subcategory,
+                    contact_whatsapp: pinData.contactWhatsapp,
+                    social_instagram: pinData.socialInstagram,
+                    social_facebook: pinData.socialFacebook,
+                    created_by: user?.id,
+                };
+
+                if (editingPinId) {
+                    await poiService.updatePoi(editingPinId, dbData);
+                    Alert.alert('✅ Pin actualizado', `"${pinTitle.trim()}" ha sido actualizado.`);
+                } else {
+                    await poiService.createPoi(dbData);
+                    Alert.alert('✅ Pin agregado', `"${pinTitle.trim()}" ha sido agregado al mapa.`);
+                }
+                await loadPins();
+            } catch (error) {
+                console.error('Error saving pin:', error);
+                Alert.alert('Error', 'No se pudo guardar el pin en el servidor');
+            } finally {
+                setIsLoading(false);
             }
         } else {
             addSolicitud({
                 title: `📍 Pin: ${pinTitle.trim()}`,
-                description: `Solicitud de nuevo pin.\n\nNombre: ${pinTitle.trim()}\nDescripción: ${pinDesc.trim() || 'Sin descripción'}\nTipo: ${pinCategory === 'servicio' ? 'Servicio' : 'Punto de Interés'}${pinCategory === 'servicio' ? `\nCategoría: ${pinSubcategory}\nWhatsApp: ${pinWhatsapp || 'N/A'}\nInstagram: ${pinInstagram || 'N/A'}\nFacebook: ${pinFacebook || 'N/A'}` : ''}\nUbicación: ${tappedLat.toFixed(6)}, ${tappedLng.toFixed(6)}`,
+                description: `Solicitud de nuevo pin.\n\nNombre: ${pinTitle.trim()}\nEmoji: ${pinEmoji}\nDescripción: ${pinDesc.trim() || 'Sin descripción'}\nTipo: ${pinCategory === 'servicio' ? 'Servicio' : 'Punto de Interés'}${pinCategory === 'servicio' ? `\nCategoría: ${pinSubcategory}\nWhatsApp: ${pinWhatsapp || 'N/A'}\nInstagram: ${pinInstagram || 'N/A'}\nFacebook: ${pinFacebook || 'N/A'}` : ''}\nUbicación: ${tappedLat.toFixed(6)}, ${tappedLng.toFixed(6)}`,
                 category: 'Nuevo Servicio/Oficio/Emprendimiento',
                 user: user?.user_metadata?.full_name || 'Vecino',
                 userEmail: user?.email || '',
@@ -123,10 +191,19 @@ export default function NeighborhoodMapScreen({ navigation }: any) {
             {
                 text: 'Eliminar',
                 style: 'destructive',
-                onPress: () => {
-                    removeMapPin(id);
-                    setShowManageModal(false);
-                    if (reviewingPin?.id === id) setShowReviewModal(false);
+                onPress: async () => {
+                    setIsLoading(true);
+                    try {
+                        await poiService.deletePoi(id);
+                        await loadPins();
+                        setShowManageModal(false);
+                        if (reviewingPin?.id === id) setShowReviewModal(false);
+                    } catch (error) {
+                        console.error('Error deleting pin:', error);
+                        Alert.alert('Error', 'No se pudo eliminar el pin del servidor');
+                    } finally {
+                        setIsLoading(false);
+                    }
                 }
             },
         ]);
@@ -175,12 +252,13 @@ export default function NeighborhoodMapScreen({ navigation }: any) {
 
             <View style={s.mapContainer}>
                 <MapView
+                    ref={mapRef}
                     style={s.map}
                     initialRegion={{
-                        latitude: -33.4920,
-                        longitude: -70.6610,
-                        latitudeDelta: 0.015,
-                        longitudeDelta: 0.0121,
+                        latitude: -33.48942,
+                        longitude: -70.6567,
+                        latitudeDelta: 0.005,
+                        longitudeDelta: 0.005,
                     }}
                     onPress={handleMapPress}
                 >
@@ -189,7 +267,8 @@ export default function NeighborhoodMapScreen({ navigation }: any) {
                             key={p.id}
                             coordinate={{ latitude: p.lat, longitude: p.lng }}
                             onPress={() => handleMarkerPress(p)}
-                            tracksViewChanges={false}
+                            // We use a small hack for custom markers on Android: 
+                            // they sometimes don't show up if tracksViewChanges is false initially.
                         >
                             <View style={s.markerContainer}>
                                 <Text style={s.markerEmoji}>{p.emoji || '📍'}</Text>
@@ -385,8 +464,22 @@ const s = StyleSheet.create({
     managePinText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 13 },
     mapContainer: { flex: 1, borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden', elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.1, shadowRadius: 8, backgroundColor: '#E2E8F0' },
     map: { width: '100%', height: '100%' },
-    markerContainer: { backgroundColor: '#FFFFFF', padding: 6, borderRadius: 20, borderWidth: 2, borderColor: '#2563EB', elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 3 },
-    markerEmoji: { fontSize: 20 },
+    markerContainer: { 
+        backgroundColor: '#FFFFFF', 
+        width: 40, 
+        height: 40, 
+        borderRadius: 20, 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        borderWidth: 2, 
+        borderColor: '#2563EB', 
+        elevation: 6, 
+        shadowColor: '#000', 
+        shadowOffset: { width: 0, height: 3 }, 
+        shadowOpacity: 0.3, 
+        shadowRadius: 4 
+    },
+    markerEmoji: { fontSize: 22 },
     modalOverlay: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.6)', justifyContent: 'center', alignItems: 'center', padding: 24 },
     modalContent: { backgroundColor: '#FFFFFF', borderRadius: 20, padding: 24, width: '100%', maxWidth: 400, elevation: 10 },
     modalTitle: { fontSize: 22, fontWeight: 'bold', color: '#1E3A5F', marginBottom: 12, textAlign: 'center' },

@@ -96,7 +96,13 @@ export default function DuesScreen({ navigation }: any) {
 
                             <View style={s.footerRow}>
                                 <View style={[s.statusBadge, { backgroundColor: info.bg }]}><Text style={[s.statusText, { color: info.color }]}>{info.label}</Text></View>
-                                {canPay && <Text style={s.payBtnText}>Subir Comprobante 📤</Text>}
+                                {canPay ? (
+                                    <Text style={s.payBtnText}>Subir Comprobante 📤</Text>
+                                ) : d.status === 'paid' ? (
+                                    <TouchableOpacity onPress={() => navigation.navigate('Voucher', { dueId: d.id })}>
+                                        <Text style={s.voucherBtnText}>Ver Comprobante 📄</Text>
+                                    </TouchableOpacity>
+                                ) : null}
                             </View>
 
                             {d.paidDate && <Text style={s.paidDate}>Pagada el {d.paidDate}</Text>}
@@ -148,6 +154,7 @@ const s = StyleSheet.create({
     emptyText: { fontSize: 16, color: '#94A3B8' },
     footerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 },
     payBtnText: { color: '#2563EB', fontSize: 13, fontWeight: '600' },
+    voucherBtnText: { color: '#059669', fontSize: 13, fontWeight: '600', textDecorationLine: 'underline' },
     rejectBox: { backgroundColor: '#FEF2F2', padding: 8, borderRadius: 6, marginTop: 8, borderWidth: 1, borderColor: '#FECACA' },
     rejectTitle: { color: '#991B1B', fontWeight: 'bold', fontSize: 13 },
     rejectComment: { color: '#B91C1C', fontSize: 12, marginTop: 2 },

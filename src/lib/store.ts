@@ -8,6 +8,14 @@ export type AnnouncementReply = {
     mediaUrl?: string; mediaType?: 'image' | 'video' | 'audio';
 };
 
+export type FavorReply = {
+    id: string;
+    message: string;
+    author: string;
+    date: string;
+    user_id: string;
+};
+
 export type Announcement = {
     id: string; title: string; body: string; priority: 'normal' | 'important'; date: string;
     schedule?: string; location?: string;
@@ -19,13 +27,15 @@ export type PollOption = { id: string; text: string; votes: number; };
 export type Poll = {
     id: string; question: string; mediaUrl?: string; mediaType?: 'image' | 'video' | 'audio';
     deadline: string; options: PollOption[]; votedBy: string[];
-    userVotes?: Record<string, string>;
+    userVotes?: Record<string, string[]>;
+    allowMultiple: boolean;
     pushEnabled: boolean; date: string;
 };
 
 export type Favor = {
     id: string; title: string; description: string; author: string; userEmail: string; date: string;
     createdAt: number; resolved: boolean;
+    replies?: FavorReply[];
 };
 
 export type SolicitudReply = {
@@ -37,6 +47,7 @@ export type Solicitud = {
     status: 'Abierta' | 'En proceso' | 'Resuelta' | 'Rechazada';
     hasImage: boolean; imageUri?: string; replies: SolicitudReply[];
     seenByAdmin: boolean; seenByUser: boolean;
+    trackingNumber: string;
 };
 
 export type OrgSettings = {
@@ -45,6 +56,7 @@ export type OrgSettings = {
 
 export type Document = {
     id: string; title: string; type: string; date: string; emoji: string; fileUri?: string;
+    folder?: 'Actas' | 'Documentos relativos' | 'Documentos contables' | 'General';
 };
 
 export type Member = {
@@ -55,6 +67,7 @@ export type MemberDue = {
     id: string; memberId: string; memberName: string; month: number; year: number; amount: number;
     status: 'paid' | 'pending' | 'overdue' | 'PENDING_VALIDATION' | 'REJECTED';
     paidDate?: string; receiptUri?: string; rejectionReason?: string; adminComment?: string;
+    voucherId?: string; // New field for Payment Voucher
 };
 
 export type FinanceEntry = {
@@ -64,6 +77,8 @@ export type FinanceEntry = {
 export type EventItem = {
     id: string; title: string; date: string; location: string; emoji: string; month: number;
     description?: string;
+    lat?: number;
+    lng?: number;
 };
 
 export type MapPinReview = {
@@ -104,7 +119,7 @@ type AppStore = {
     removeAnnouncement: (id: string) => void;
     addAnnouncementReply: (announcementId: string, message: string, userName: string, from: 'admin' | 'user', mediaUrl?: string, mediaType?: 'image' | 'video' | 'audio') => void;
 
-    addPoll: (p: Omit<Poll, 'id' | 'date' | 'votedBy'>) => void;
+    addPoll: (p: Omit<Poll, 'id' | 'date' | 'votedBy' | 'userVotes'>) => void;
     votePoll: (pollId: string, optionId: string, userId: string) => void;
     removePoll: (id: string) => void;
 
@@ -112,7 +127,7 @@ type AppStore = {
     updateFavor: (id: string, updates: Partial<Favor>) => void;
     removeFavor: (id: string) => void;
 
-    addSolicitud: (s: Omit<Solicitud, 'id' | 'date' | 'status' | 'replies' | 'seenByAdmin' | 'seenByUser'>) => void;
+    addSolicitud: (s: Omit<Solicitud, 'id' | 'date' | 'status' | 'replies' | 'seenByAdmin' | 'seenByUser' | 'trackingNumber'>) => void;
     removeSolicitud: (id: string) => void;
     updateSolicitudStatus: (id: string, status: Solicitud['status']) => void;
     addSolicitudReply: (solicitudId: string, message: string, from: 'admin' | 'user') => void;
@@ -136,9 +151,15 @@ type AppStore = {
     addMapPinReview: (pinId: string, review: Omit<MapPinReview, 'id' | 'date'>) => void;
     updateOrgSettings: (s: Partial<OrgSettings>) => void;
     setFavors: (favors: Favor[]) => void;
+    setMapPins: (pins: MapPin[]) => void;
 };
 
-const now = () => new Date().toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' });
+const MONTHS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+
+const now = () => {
+    const d = new Date();
+    return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+};
 
 export const useAppStore = create<AppStore>()(
     persist(
@@ -149,11 +170,11 @@ export const useAppStore = create<AppStore>()(
                 { id: '3', title: 'Nuevo horario de recolección', body: 'A partir de marzo, la recolección de basura será los días lunes, miércoles y viernes a partir de las 07:00 hrs.', priority: 'normal', date: '25 Feb 2026', replies: [] },
             ],
             solicitudes: [
-                { id: '1', title: 'Certificado de Residencia', description: 'Necesito un certificado para presentarlo en la municipalidad', category: 'Certificado', user: 'Javier Aravena Espejo', userEmail: 'javier.aravena25@gmail.com', date: '10 Feb 2026 14:30', status: 'Abierta', hasImage: false, replies: [], seenByAdmin: false, seenByUser: true },
-                { id: '2', title: 'Poda de árboles', description: 'Hay unas ramas peligrosas cerca de los cables en mi calle', category: 'Solicitud Municipal', user: 'María González López', userEmail: 'maria.gonzalez@gmail.com', date: '05 Feb 2026 09:15', status: 'Resuelta', hasImage: true, imageUri: 'mock', replies: [{ id: '1r', message: 'Se envió oficio a la municipalidad', from: 'admin', date: '06 Feb 2026' }], seenByAdmin: true, seenByUser: true }
+                { id: '1', title: 'Certificado de Residencia', description: 'Necesito un certificado para presentarlo en la municipalidad', category: 'Certificado', user: 'Javier Aravena Espejo', userEmail: 'javier.aravena25@gmail.com', date: '10 Feb 2026 14:30', status: 'Abierta', hasImage: false, replies: [], seenByAdmin: false, seenByUser: true, trackingNumber: 'SOL-FREE-001' },
+                { id: '2', title: 'Poda de árboles', description: 'Hay unas ramas peligrosas cerca de los cables en mi calle', category: 'Solicitud Municipal', user: 'María González López', userEmail: 'maria.gonzalez@gmail.com', date: '05 Feb 2026 09:15', status: 'Resuelta', hasImage: true, imageUri: 'mock', replies: [{ id: '1r', message: 'Se envió oficio a la municipalidad', from: 'admin', date: '06 Feb 2026' }], seenByAdmin: true, seenByUser: true, trackingNumber: 'SOL-FREE-002' }
             ],
             documents: [
-                { id: '1', title: 'Acta Reunión Febrero 2026', type: 'Acta', date: '15 Feb 2026', emoji: '📋' },
+                { id: '1', title: 'Acta Reunión Febrero 2026', type: 'Acta', date: '15 Feb 2026', emoji: '📋', folder: 'Actas' },
                 { id: '2', title: 'Reglamento Interno JJVV', type: 'Reglamento', date: '01 Ene 2026', emoji: '📖' },
                 { id: '3', title: 'Balance Financiero 2025', type: 'Finanzas', date: '31 Dic 2025', emoji: '💰' },
             ],
@@ -212,25 +233,48 @@ export const useAppStore = create<AppStore>()(
                 } : a),
             })),
 
-            addPoll: (p) => set((state) => ({ polls: [{ ...p, id: Date.now().toString(), date: now(), votedBy: [] }, ...state.polls] })),
+            addPoll: (p) => set((state) => ({ polls: [{ ...p, id: Date.now().toString(), date: now(), votedBy: [], userVotes: {} }, ...state.polls] })),
             votePoll: (pollId, optionId, userId) => set((state) => ({
                 polls: state.polls.map(p => {
                     if (p.id !== pollId) return p;
-                    const prevVote = p.userVotes?.[userId] || (p.votedBy.includes(userId) ? null : undefined);
-                    if (prevVote === optionId) return p; // Same vote, do nothing
-
+                    
+                    const currentVotes = p.userVotes?.[userId] || [];
+                    const allowMultiple = p.allowMultiple;
+                    
+                    let newVotes: string[] = [];
                     let newOptions = p.options.map(o => ({ ...o }));
-                    if (prevVote) {
-                        const prevOptIndex = newOptions.findIndex(o => o.id === prevVote);
-                        if (prevOptIndex >= 0) newOptions[prevOptIndex].votes = Math.max(0, newOptions[prevOptIndex].votes - 1);
+
+                    if (allowMultiple) {
+                        // Toggle logic
+                        if (currentVotes.includes(optionId)) {
+                            newVotes = currentVotes.filter(v => v !== optionId);
+                            const optIndex = newOptions.findIndex(o => o.id === optionId);
+                            if (optIndex >= 0) newOptions[optIndex].votes = Math.max(0, newOptions[optIndex].votes - 1);
+                        } else {
+                            newVotes = [...currentVotes, optionId];
+                            const optIndex = newOptions.findIndex(o => o.id === optionId);
+                            if (optIndex >= 0) newOptions[optIndex].votes++;
+                        }
+                    } else {
+                        // Single choice logic
+                        if (currentVotes.includes(optionId)) return p; // Already voted for this
+
+                        // Remove previous vote count if exists
+                        if (currentVotes.length > 0) {
+                            const prevVoteId = currentVotes[0];
+                            const prevOptIndex = newOptions.findIndex(o => o.id === prevVoteId);
+                            if (prevOptIndex >= 0) newOptions[prevOptIndex].votes = Math.max(0, newOptions[prevOptIndex].votes - 1);
+                        }
+
+                        newVotes = [optionId];
+                        const newOptIndex = newOptions.findIndex(o => o.id === optionId);
+                        if (newOptIndex >= 0) newOptions[newOptIndex].votes++;
                     }
-                    const newOptIndex = newOptions.findIndex(o => o.id === optionId);
-                    if (newOptIndex >= 0) newOptions[newOptIndex].votes++;
 
                     return {
                         ...p,
                         votedBy: p.votedBy.includes(userId) ? p.votedBy : [...p.votedBy, userId],
-                        userVotes: { ...(p.userVotes || {}), [userId]: optionId },
+                        userVotes: { ...(p.userVotes || {}), [userId]: newVotes },
                         options: newOptions
                     };
                 })
@@ -245,9 +289,17 @@ export const useAppStore = create<AppStore>()(
             updateEvent: (id, updates) => set((state) => ({ events: state.events.map(ev => ev.id === id ? { ...ev, ...updates } : ev) })),
             removeEvent: (id) => set((state) => ({ events: state.events.filter(ev => ev.id !== id) })),
 
-            addSolicitud: (s) => set((state) => ({
-                solicitudes: [{ ...s, category: s.category || 'Otro', id: Date.now().toString(), date: now(), status: 'Abierta', replies: [], seenByAdmin: false, seenByUser: true }, ...state.solicitudes],
-            })),
+            addSolicitud: (s) => set((state) => {
+                let trackingNumber = '';
+                let isUnique = false;
+                while (!isUnique) {
+                    trackingNumber = `SOL-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`;
+                    isUnique = !state.solicitudes.some(sol => sol.trackingNumber === trackingNumber);
+                }
+                return {
+                    solicitudes: [{ ...s, category: s.category || 'Otro', id: Date.now().toString(), date: now(), status: 'Abierta', replies: [], seenByAdmin: false, seenByUser: true, trackingNumber }, ...state.solicitudes],
+                };
+            }),
             removeSolicitud: (id) => set((state) => ({
                 solicitudes: state.solicitudes.filter(s => s.id !== id),
             })),
@@ -266,9 +318,13 @@ export const useAppStore = create<AppStore>()(
                 solicitudes: state.solicitudes.map(s => s.id === id ? { ...s, [by === 'admin' ? 'seenByAdmin' : 'seenByUser']: true } : s),
             })),
 
-            addDocument: (d) => set((state) => ({
-                documents: [{ ...d, id: Date.now().toString(), date: now() }, ...state.documents],
-            })),
+            addDocument: (d) => set((state) => {
+                const date = new Date();
+                const dateStr = `${date.getDate()} ${MONTHS[date.getMonth()]} ${date.getFullYear()}`;
+                return {
+                    documents: [{ ...d, id: Date.now().toString(), date: dateStr, folder: d.folder || 'General' }, ...state.documents],
+                };
+            }),
             removeDocument: (id) => set((state) => ({
                 documents: state.documents.filter(d => d.id !== id),
             })),
@@ -283,9 +339,18 @@ export const useAppStore = create<AppStore>()(
                 finances: state.finances.filter(f => f.id !== id),
             })),
 
-            updateMemberDue: (id, status, paidDate) => set((state) => ({
-                memberDues: state.memberDues.map(d => d.id === id ? { ...d, status, paidDate } : d),
-            })),
+            updateMemberDue: (id: string, status: MemberDue['status'], paidDate?: string) => {
+        set(state => ({
+            memberDues: state.memberDues.map(d => {
+                if (d.id === id) {
+                    const isNewPayment = status === 'paid' && d.status !== 'paid';
+                    const voucherId = isNewPayment ? `V-${d.year}-${Math.floor(1000 + Math.random() * 9000)}` : d.voucherId;
+                    return { ...d, status, paidDate, voucherId };
+                }
+                return d;
+            })
+        }));
+    },
             submitDueReceipt: (id, receiptUri) => set((state) => ({
                 memberDues: state.memberDues.map(d => d.id === id ? { ...d, status: 'PENDING_VALIDATION', receiptUri } : d),
             })),
@@ -313,6 +378,7 @@ export const useAppStore = create<AppStore>()(
                 orgSettings: { ...state.orgSettings, ...s },
             })),
             setFavors: (favors) => set({ favors }),
+            setMapPins: (pins) => set({ mapPins: pins }),
         }),
         {
             name: 'jjvv-app-storage-v6',

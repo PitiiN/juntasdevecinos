@@ -2,9 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, TextInput, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppStore } from '../../lib/store';
+import { poiService } from '../../services/poiService';
+import { useAuth } from '../../context/AuthContext';
 
 export default function SolicitudDetailScreen({ route, navigation }: any) {
     const { id, isAdmin } = route.params;
+    const { user, organizationId } = useAuth();
     const { solicitudes, updateSolicitudStatus, addSolicitudReply, markSolicitudSeen, addMapPin } = useAppStore();
     const solicitud = solicitudes.find(s => s.id === id);
     const [reply, setReply] = useState('');
@@ -39,6 +42,10 @@ export default function SolicitudDetailScreen({ route, navigation }: any) {
             <ScrollView contentContainerStyle={s.scroll}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={s.back}><Text style={s.backText}>← Volver</Text></TouchableOpacity>
 
+                <View style={[s.header, { marginBottom: 4 }]}>
+                    <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#64748B' }}>#{solicitud.trackingNumber}</Text>
+                </View>
+
                 <View style={s.header}>
                     <Text style={s.title}>{solicitud.title}</Text>
                     <View style={[s.badge, { backgroundColor: getStatusColor(solicitud.status) }]}><Text style={s.badgeText}>{solicitud.status}</Text></View>
@@ -68,7 +75,7 @@ export default function SolicitudDetailScreen({ route, navigation }: any) {
                 )}
 
                 {isAdmin && solicitud.title.startsWith('📍 Pin:') && solicitud.status !== 'Resuelta' && solicitud.status !== 'Rechazada' && (
-                    <TouchableOpacity style={s.pinBtn} onPress={() => {
+                    <TouchableOpacity style={s.pinBtn} onPress={async () => {
                         const titleMatch = solicitud.description.match(/Nombre: (.*)/);
                         const descMatch = solicitud.description.match(/Descripción: (.*)/);
                         const typeMatch = solicitud.description.match(/Tipo: (.*)/);
@@ -79,33 +86,61 @@ export default function SolicitudDetailScreen({ route, navigation }: any) {
                         const description = descMatch ? descMatch[1] : '';
                         const category = typeMatch && typeMatch[1].includes('Punto de Interés') ? 'punto_interes' : 'servicio';
                         const emoji = emojiMatch ? emojiMatch[1] : '📍';
-                        let lat = -33.4920, lng = -70.6610;
+                        let lat = -33.48942, lng = -70.6567; // Default to San Ignacio/Florencia
 
                         if (locMatch && locMatch.length >= 3) {
                             lat = parseFloat(locMatch[1]);
                             lng = parseFloat(locMatch[2]);
                         }
 
-                        addMapPin({ title, description, category, lat, lng, emoji });
-                        updateSolicitudStatus(solicitud.id, 'Resuelta');
-                        Alert.alert('✅ Pin Aprobado y Agregado', `El pin "${title}" ha sido agregado al mapa y la solicitud ha sido resuelta.`);
+                        try {
+                            if (organizationId) {
+                                await poiService.createPoi({
+                                    organization_id: organizationId,
+                                    name: title,
+                                    description: description,
+                                    category: category,
+                                    latitude: lat,
+                                    longitude: lng,
+                                    emoji: emoji,
+                                    created_by: user?.id,
+                                });
+                                updateSolicitudStatus(solicitud.id, 'Resuelta');
+                                Alert.alert('✅ Pin Aprobado y Agregado', `El pin "${title}" ha sido agregado al mapa y la solicitud ha sido resuelta.`);
+                            } else {
+                                Alert.alert('Error', 'No se pudo identificar la organización.');
+                            }
+                        } catch (error) {
+                            console.error('Error approving pin:', error);
+                            Alert.alert('Error', 'No se pudo guardar el pin en el servidor.');
+                        }
                     }}>
                         <Text style={s.pinBtnText}>✅ Aprobar Pin y Marcar Resuelta</Text>
                     </TouchableOpacity>
                 )}
 
                 {isAdmin && solicitud.category && ['Servicio', 'Oficio', 'Emprendimiento', 'Servicio/Oficio/Emprendimiento'].some(c => solicitud.category.includes(c)) && !solicitud.title.startsWith('📍 Pin:') && (
-                    <TouchableOpacity style={s.pinBtn} onPress={() => {
-                        const lat = -33.4920 + (Math.random() - 0.5) * 0.004;
-                        const lng = -70.6610 + (Math.random() - 0.5) * 0.004;
-                        addMapPin({
-                            title: solicitud.title,
-                            description: `${solicitud.description.substring(0, 80)} — ${solicitud.user}`,
-                            category: 'servicio',
-                            lat, lng,
-                            emoji: '🔧',
-                        });
-                        Alert.alert('✅ Pin agregado', `"${solicitud.title}" ha sido agregado al Mapa del Barrio.`);
+                    <TouchableOpacity style={s.pinBtn} onPress={async () => {
+                        const lat = -33.48942 + (Math.random() - 0.5) * 0.004;
+                        const lng = -70.6567 + (Math.random() - 0.5) * 0.004;
+                        try {
+                            if (organizationId) {
+                                await poiService.createPoi({
+                                    organization_id: organizationId,
+                                    name: solicitud.title,
+                                    description: `${solicitud.description.substring(0, 80)} — ${solicitud.user}`,
+                                    category: 'servicio',
+                                    latitude: lat,
+                                    longitude: lng,
+                                    emoji: '🔧',
+                                    created_by: user?.id,
+                                });
+                                Alert.alert('✅ Pin agregado', `"${solicitud.title}" ha sido agregado al Mapa del Barrio.`);
+                            }
+                        } catch (error) {
+                            console.error('Error adding pin:', error);
+                            Alert.alert('Error', 'No se pudo guardar el pin en el servidor.');
+                        }
                     }}>
                         <Text style={s.pinBtnText}>📍 Agregar como Pin al Mapa</Text>
                     </TouchableOpacity>

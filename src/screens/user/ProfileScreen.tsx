@@ -10,10 +10,6 @@ export default function ProfileScreen({ navigation }: any) {
     const email = user?.email || '';
     const createdAt = user?.created_at ? new Date(user.created_at).toLocaleDateString('es-CL') : '';
 
-    // Email modal
-    const [showEmailModal, setShowEmailModal] = useState(false);
-    const [newEmail, setNewEmail] = useState('');
-    const [emailLoading, setEmailLoading] = useState(false);
 
     // Password modal
     const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -63,22 +59,6 @@ export default function ProfileScreen({ navigation }: any) {
         }
     };
 
-    const handleChangeEmail = async () => {
-        if (!newEmail.trim() || !newEmail.includes('@')) {
-            Alert.alert('Error', 'Ingresa un correo electrónico válido.');
-            return;
-        }
-        setEmailLoading(true);
-        const { error } = await supabase.auth.updateUser({ email: newEmail.trim() });
-        setEmailLoading(false);
-        if (error) {
-            Alert.alert('Error', error.message);
-        } else {
-            Alert.alert('✅ Correo actualizado', 'Tu correo ha sido actualizado exitosamente.');
-            setShowEmailModal(false);
-            setNewEmail('');
-        }
-    };
 
     const handleChangePassword = async () => {
         if (!newPassword || newPassword.length < 6) {
@@ -146,9 +126,6 @@ export default function ProfileScreen({ navigation }: any) {
                     <Text style={s.value}>UV 22 • San Miguel</Text>
                 </View>
 
-                <TouchableOpacity style={s.emailBtn} onPress={() => setShowEmailModal(true)}>
-                    <Text style={s.emailText}>✉️ Cambiar Correo Electrónico</Text>
-                </TouchableOpacity>
 
                 <TouchableOpacity style={s.resetBtn} onPress={() => setShowPasswordModal(true)}>
                     <Text style={s.resetText}>🔑 Cambiar Contraseña</Text>
@@ -177,30 +154,6 @@ export default function ProfileScreen({ navigation }: any) {
                     </TouchableOpacity>
                 </Modal>
 
-                {/* Email Modal */}
-                <Modal visible={showEmailModal} transparent animationType="fade">
-                    <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => setShowEmailModal(false)}>
-                        <View style={s.modalContent} onStartShouldSetResponder={() => true}>
-                            <Text style={s.modalTitle}>Cambiar correo electrónico</Text>
-                            <Text style={s.modalSub}>Correo actual: {email}</Text>
-                            <TextInput
-                                style={s.input}
-                                placeholder="Nuevo correo electrónico"
-                                placeholderTextColor="#94A3B8"
-                                value={newEmail}
-                                onChangeText={setNewEmail}
-                                keyboardType="email-address"
-                                autoCapitalize="none"
-                            />
-                            <TouchableOpacity style={[s.confirmBtn, emailLoading && { opacity: 0.6 }]} onPress={handleChangeEmail} disabled={emailLoading}>
-                                <Text style={s.confirmText}>{emailLoading ? 'Guardando...' : 'Confirmar cambio'}</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity onPress={() => setShowEmailModal(false)} style={s.cancelBtn}>
-                                <Text style={s.cancelText}>Cancelar</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </TouchableOpacity>
-                </Modal>
 
                 {/* Password Modal */}
                 <Modal visible={showPasswordModal} transparent animationType="fade">
@@ -250,8 +203,6 @@ const s = StyleSheet.create({
     card: { backgroundColor: '#FFFFFF', borderRadius: 12, padding: 16, marginBottom: 10, elevation: 1 },
     label: { fontSize: 12, color: '#94A3B8', fontWeight: '600', textTransform: 'uppercase', marginBottom: 4 },
     value: { fontSize: 16, color: '#0F172A', fontWeight: '500' },
-    emailBtn: { backgroundColor: '#EFF6FF', borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 16, borderWidth: 1, borderColor: '#BFDBFE' },
-    emailText: { color: '#1D4ED8', fontWeight: 'bold', fontSize: 16 },
     resetBtn: { backgroundColor: '#FEF3C7', borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 10, borderWidth: 1, borderColor: '#FDE68A' },
     resetText: { color: '#92400E', fontWeight: 'bold', fontSize: 16 },
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 30 },

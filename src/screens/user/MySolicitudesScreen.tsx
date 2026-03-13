@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppStore } from '../../lib/store';
 import { useAuth } from '../../context/AuthContext';
@@ -30,11 +30,30 @@ export default function MySolicitudesScreen({ navigation }: any) {
         );
     };
 
+    const handleWhatsApp = () => {
+        const url = 'https://wa.me/56912345678'; // Placeholder
+        Linking.openURL(url).catch(() => Alert.alert('Error', 'No se pudo abrir WhatsApp.'));
+    };
+
+    const handleEmail = () => {
+        const url = 'mailto:contacto@municipalidad.cl'; // Placeholder
+        Linking.openURL(url).catch(() => Alert.alert('Error', 'No se pudo abrir el correo.'));
+    };
+
     return (
         <SafeAreaView style={s.safe}>
             <ScrollView contentContainerStyle={s.scroll}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={s.back}><Text style={s.backText}>← Volver</Text></TouchableOpacity>
                 <Text style={s.title}>📝 Mis Solicitudes</Text>
+
+                <View style={s.contactRow}>
+                    <TouchableOpacity style={[s.contactBtn, { backgroundColor: '#25D366' }]} onPress={handleWhatsApp}>
+                        <Text style={s.contactBtnText}>🟢 Whatsapp Municipal</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[s.contactBtn, { backgroundColor: '#3B82F6' }]} onPress={handleEmail}>
+                        <Text style={s.contactBtnText}>📧 Correo Municipal</Text>
+                    </TouchableOpacity>
+                </View>
 
                 <TouchableOpacity style={s.newBtn} onPress={() => navigation.navigate('NewSolicitud')}>
                     <Text style={s.newBtnText}>+ Nueva Solicitud</Text>
@@ -46,7 +65,10 @@ export default function MySolicitudesScreen({ navigation }: any) {
                     <View key={sol.id} style={s.card}>
                         <TouchableOpacity onPress={() => navigation.navigate('SolicitudDetail', { id: sol.id })} activeOpacity={0.7}>
                             <View style={s.cardHeader}>
-                                <Text style={s.cardTitle} numberOfLines={1}>{sol.title}</Text>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={s.trackingCode}>{sol.trackingNumber}</Text>
+                                    <Text style={s.cardTitle} numberOfLines={1}>{sol.title}</Text>
+                                </View>
                                 <View style={[s.badge, { backgroundColor: getStatusColor(sol.status) }]}><Text style={s.badgeText}>{sol.status}</Text></View>
                             </View>
                             <Text style={s.desc} numberOfLines={2}>{sol.description}</Text>
@@ -70,10 +92,14 @@ const s = StyleSheet.create({
     safe: { flex: 1, backgroundColor: 'transparent' }, scroll: { padding: 20 },
     back: { marginBottom: 16 }, backText: { color: '#2563EB', fontSize: 16, fontWeight: '600' },
     title: { fontSize: 24, fontWeight: 'bold', color: '#1E3A5F', marginBottom: 16 },
+    contactRow: { flexDirection: 'row', gap: 10, marginBottom: 16 },
+    contactBtn: { flex: 1, borderRadius: 10, padding: 12, alignItems: 'center', elevation: 2 },
+    contactBtnText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 13 },
     newBtn: { backgroundColor: '#2563EB', borderRadius: 12, padding: 14, alignItems: 'center', marginBottom: 16 },
     newBtnText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 16 },
     card: { backgroundColor: '#FFFFFF', borderRadius: 12, padding: 14, marginBottom: 10, elevation: 1 },
-    cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+    cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 },
+    trackingCode: { fontSize: 10, fontWeight: 'bold', color: '#64748B', marginBottom: 2 },
     cardTitle: { fontSize: 14, fontWeight: '600', color: '#0F172A', flex: 1, marginRight: 8 },
     badge: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }, badgeText: { color: '#FFFFFF', fontSize: 11, fontWeight: 'bold' },
     desc: { fontSize: 13, color: '#64748B', marginBottom: 6 },

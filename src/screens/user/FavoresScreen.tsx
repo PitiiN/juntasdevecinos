@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, Alert, Modal, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppStore } from '../../lib/store';
 import { useAuth } from '../../context/AuthContext';
@@ -18,12 +18,30 @@ export default function FavoresScreen({ navigation }: any) {
     const [description, setDescription] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
+    // Chat states
+    const [selectedFavor, setSelectedFavor] = useState<any>(null);
+    const [replyText, setReplyText] = useState('');
+
     const loadFavors = async () => {
         if (!organizationId) return;
         setIsLoading(true);
         try {
             const data = await favorService.getFavors(organizationId);
-            setFavors(data);
+            
+            // Auto-deletion logic: Resolve favors > 2 weeks
+            const twoWeeksAgo = Date.now() - 14 * 24 * 60 * 60 * 1000;
+            const expiredFavors = data.filter(f => !f.resolved && f.createdAt < twoWeeksAgo);
+            
+            for (const f of expiredFavors) {
+                try {
+                    await favorService.deleteFavor(f.id);
+                } catch (e) {
+                    console.error('Error auto-deleting favor:', f.id, e);
+                }
+            }
+
+            const activeData = data.filter(f => !expiredFavors.some(ef => ef.id === f.id));
+            setFavors(activeData);
         } catch (error) {
             console.error('Error loading favors:', error);
             Alert.alert('Error', 'No se pudieron cargar los favores');
@@ -99,11 +117,6 @@ export default function FavoresScreen({ navigation }: any) {
     };
 
     const startEdit = (f: any) => {
-        const isExpired = (Date.now() - f.createdAt) > 24 * 60 * 60 * 1000;
-        if (isExpired) {
-            Alert.alert('No editable', 'Los favores no pueden modificarse después de 24 horas para mantener su contexto.');
-            return;
-        }
         setEditId(f.id);
         setTitle(f.title);
         setDescription(f.description);
@@ -158,6 +171,30 @@ export default function FavoresScreen({ navigation }: any) {
         );
     };
 
+    const handleSendReply = async () => {
+        if (!replyText.trim() || !selectedFavor || !user) return;
+        
+        setIsLoading(true);
+        try {
+            const authorName = user?.user_metadata?.full_name || 'Vecino';
+            await favorService.createReply(selectedFavor.id, {
+                message: replyText,
+                author: authorName,
+                user_id: user.id
+            });
+            setReplyText('');
+            await loadFavors();
+            // Refresh local selected favor to show new reply
+            const updated = favors.find(f => f.id === selectedFavor.id);
+            if (updated) setSelectedFavor(updated);
+        } catch (error) {
+            console.error('Error sending reply:', error);
+            Alert.alert('Error', 'No se pudo enviar el mensaje');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     // Splitting array for "masonry" 2-col look
     const col1 = activeFavors.filter((_, i) => i % 2 === 0);
     const col2 = activeFavors.filter((_, i) => i % 2 !== 0);
@@ -175,7 +212,7 @@ export default function FavoresScreen({ navigation }: any) {
                     <Text style={s.pDate}>{f.date}</Text>
                 </View>
 
-                {isMine && (
+                {isMine ? (
                     <View style={s.ownerActions}>
                         <TouchableOpacity style={s.actionBtnText} onPress={() => startEdit(f)}><Text>✏️</Text></TouchableOpacity>
                         <TouchableOpacity style={s.actionBtnText} onPress={() => handleDelete(f.id)}><Text>🗑️</Text></TouchableOpacity>
@@ -183,6 +220,16 @@ export default function FavoresScreen({ navigation }: any) {
                             <Text style={s.resolveText}>✅ Resuelto</Text>
                         </TouchableOpacity>
                     </View>
+                ) : (
+                    <TouchableOpacity style={s.replyTrigger} onPress={() => setSelectedFavor(f)}>
+                        <Text style={s.replyTriggerText}>💬 Responder / Chat ({f.replies?.length || 0})</Text>
+                    </TouchableOpacity>
+                )}
+
+                {isMine && (f.replies?.length || 0) > 0 && (
+                    <TouchableOpacity style={[s.replyTrigger, { marginTop: 10 }]} onPress={() => setSelectedFavor(f)}>
+                        <Text style={s.replyTriggerText}>👀 Ver Chat ({f.replies?.length})</Text>
+                    </TouchableOpacity>
                 )}
             </View>
         );
@@ -226,6 +273,52 @@ export default function FavoresScreen({ navigation }: any) {
                     </View>
                 )}
             </ScrollView>
+
+            <Modal visible={!!selectedFavor} animationType="slide" transparent={false}>
+                <SafeAreaView style={s.modalSafe}>
+                    <View style={s.modalHeader}>
+                        <TouchableOpacity onPress={() => setSelectedFavor(null)}>
+                            <Text style={s.closeText}>Cerrar</Text>
+                        </TouchableOpacity>
+                        <Text style={s.modalTitle} numberOfLines={1}>Chat: {selectedFavor?.title}</Text>
+                        <View style={{ width: 50 }} />
+                    </View>
+
+                    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+                        <ScrollView contentContainerStyle={s.chatScroll}>
+                            <View style={s.originalFavorBox}>
+                                <Text style={s.originalAuthor}>{selectedFavor?.author} pidió:</Text>
+                                <Text style={s.originalDesc}>{selectedFavor?.description}</Text>
+                            </View>
+
+                            {(selectedFavor?.replies || []).length === 0 ? (
+                                <Text style={s.noReplies}>Aún no hay respuestas. ¡Sé el primero en ayudar!</Text>
+                            ) : (
+                                selectedFavor.replies.map((r: any) => (
+                                    <View key={r.id} style={[s.replyBubble, r.user_id === user?.id && s.myReply]}>
+                                        <Text style={s.replyAuthor}>{r.author}</Text>
+                                        <Text style={s.replyMessage}>{r.message}</Text>
+                                        <Text style={s.replyDate}>{r.date}</Text>
+                                    </View>
+                                ))
+                            )}
+                        </ScrollView>
+
+                        <View style={s.inputArea}>
+                            <TextInput
+                                style={s.chatInput}
+                                placeholder="Escribe un mensaje para ayudar..."
+                                value={replyText}
+                                onChangeText={setReplyText}
+                                multiline
+                            />
+                            <TouchableOpacity style={s.sendBtn} onPress={handleSendReply} disabled={isLoading}>
+                                <Text style={s.sendBtnText}>{isLoading ? '...' : 'Enviar'}</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </KeyboardAvoidingView>
+                </SafeAreaView>
+            </Modal>
         </SafeAreaView>
     );
 }
@@ -259,4 +352,24 @@ const s = StyleSheet.create({
     resolveText: { fontSize: 11, fontWeight: '700', color: '#059669' },
     empty: { alignItems: 'center', marginTop: 40 },
     emptyText: { color: '#94A3B8', fontSize: 16 },
+    replyTrigger: { borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.1)', paddingTop: 8, marginTop: 4, alignItems: 'center' },
+    replyTriggerText: { fontSize: 11, fontWeight: '700', color: '#3B82F6' },
+    modalSafe: { flex: 1, backgroundColor: '#FFFFFF' },
+    modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#E2E8F0' },
+    closeText: { color: '#EF4444', fontSize: 16, fontWeight: '600' },
+    modalTitle: { fontSize: 16, fontWeight: 'bold', color: '#1E3A5F', flex: 1, textAlign: 'center', marginHorizontal: 10 },
+    chatScroll: { padding: 16 },
+    originalFavorBox: { backgroundColor: '#F8FAFC', padding: 12, borderRadius: 12, marginBottom: 20, borderLeftWidth: 4, borderLeftColor: '#3B82F6' },
+    originalAuthor: { fontSize: 12, fontWeight: 'bold', color: '#64748B', marginBottom: 4 },
+    originalDesc: { fontSize: 14, color: '#1E3A5F', fontStyle: 'italic' },
+    replyBubble: { backgroundColor: '#F1F5F9', padding: 12, borderRadius: 16, alignSelf: 'flex-start', maxWidth: '85%', marginBottom: 12 },
+    myReply: { backgroundColor: '#DBEAFE', alignSelf: 'flex-end' },
+    replyAuthor: { fontSize: 11, fontWeight: 'bold', color: '#475569', marginBottom: 2 },
+    replyMessage: { fontSize: 14, color: '#191C1E' },
+    replyDate: { fontSize: 9, color: '#94A3B8', marginTop: 4, textAlign: 'right' },
+    noReplies: { textAlign: 'center', color: '#94A3B8', marginTop: 20 },
+    inputArea: { flexDirection: 'row', padding: 12, borderTopWidth: 1, borderTopColor: '#E2E8F0', alignItems: 'flex-end' },
+    chatInput: { flex: 1, backgroundColor: '#F1F5F9', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8, fontSize: 15, maxHeight: 100 },
+    sendBtn: { marginLeft: 10, paddingBottom: 10 },
+    sendBtnText: { color: '#3B82F6', fontWeight: 'bold', fontSize: 16 },
 });

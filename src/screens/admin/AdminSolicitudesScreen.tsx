@@ -68,7 +68,10 @@ export default function AdminSolicitudesScreen() {
                 ) : filtered.map(sol => (
                     <TouchableOpacity key={sol.id} style={s.card} activeOpacity={0.7} onPress={() => navigation.navigate('AdminSolicitudDetail', { id: sol.id, isAdmin: true })}>
                         <View style={s.cardHeader}>
-                            <Text style={s.cardTitle} numberOfLines={2}>{sol.title}</Text>
+                            <View style={{ flex: 1 }}>
+                                <Text style={s.trackingCode}>{sol.trackingNumber}</Text>
+                                <Text style={s.cardTitle} numberOfLines={2}>{sol.title}</Text>
+                            </View>
                             <View style={[s.badge, { backgroundColor: getStatusColor(sol.status) }]}><Text style={s.badgeText}>{sol.status}</Text></View>
                         </View>
                         {sol.category ? <Text style={s.category}>📋 {sol.category}</Text> : null}
@@ -129,7 +132,8 @@ const s = StyleSheet.create({
     stat: { flex: 1, borderRadius: 12, padding: 12, alignItems: 'center', marginHorizontal: 3, elevation: 1 },
     statNum: { fontSize: 22, fontWeight: 'bold', color: '#0F172A' }, statLabel: { fontSize: 11, color: '#64748B', marginTop: 2 },
     card: { backgroundColor: '#FFFFFF', borderRadius: 12, padding: 14, marginBottom: 10, elevation: 1 },
-    cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+    cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 },
+    trackingCode: { fontSize: 10, fontWeight: 'bold', color: '#64748B', marginBottom: 2 },
     cardTitle: { fontSize: 14, fontWeight: '600', color: '#0F172A', flex: 1, marginRight: 8 },
     badge: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }, badgeText: { color: '#FFFFFF', fontSize: 11, fontWeight: 'bold' },
     category: { fontSize: 12, color: '#7C3AED', fontWeight: '500', marginBottom: 4 },

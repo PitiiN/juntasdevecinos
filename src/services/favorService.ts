@@ -5,7 +5,7 @@ export const favorService = {
     async getFavors(organizationId: string): Promise<Favor[]> {
         const { data, error } = await supabase
             .from('favors')
-            .select('*')
+            .select('*, favor_replies(*)')
             .eq('organization_id', organizationId)
             .order('created_at', { ascending: false });
 
@@ -20,7 +20,14 @@ export const favorService = {
             userEmail: f.user_email,
             date: new Date(f.created_at).toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' }),
             createdAt: new Date(f.created_at).getTime(),
-            resolved: f.resolved
+            resolved: f.resolved,
+            replies: (f.favor_replies || []).map((r: any) => ({
+                id: r.id,
+                message: r.message,
+                author: r.author_name,
+                date: new Date(r.created_at).toLocaleDateString('es-CL', { day: '2-digit', month: 'short' }),
+                user_id: r.user_id
+            }))
         }));
     },
 
@@ -62,6 +69,19 @@ export const favorService = {
             .from('favors')
             .delete()
             .eq('id', id);
+
+        if (error) throw error;
+    },
+
+    async createReply(favorId: string, reply: { message: string, author: string, user_id: string }) {
+        const { error } = await supabase
+            .from('favor_replies')
+            .insert({
+                favor_id: favorId,
+                message: reply.message,
+                author_name: reply.author,
+                user_id: reply.user_id
+            });
 
         if (error) throw error;
     },

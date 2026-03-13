@@ -11,13 +11,24 @@ export default function MoreScreen() {
     const solicitudes = useAppStore(s => s.solicitudes);
     const documents = useAppStore(s => s.documents);
     const seenDocsCount = useAppStore(s => s.seenDocsCount);
+    const seenAvisosCount = useAppStore(s => s.seenAvisosCount);
     const markDocsSeen = useAppStore(s => s.markDocsSeen);
+    const announcements = useAppStore(s => s.announcements);
+    const unreadAvisos = Math.max(0, announcements.length - (seenAvisosCount || 0));
 
     const mySolicitudes = solicitudes.filter(s => s.userEmail === user?.email || s.user === user?.user_metadata?.full_name);
     const unreadSolicitudes = mySolicitudes.filter(s => !s.seenByUser).length;
     const unreadDocs = Math.max(0, documents.length - seenDocsCount);
 
+    // Helper function for navigation to tabs, assuming 'Home' is the tab navigator
+    const goToTab = (screenName: string) => {
+        navigation.navigate('Home', { screen: screenName });
+    };
+
     const items = [
+        { title: 'Avisos', icon: '📢', screen: 'Avisos', badge: unreadAvisos, isTab: true },
+        { title: 'Directiva', icon: '🏢', screen: 'Directiva', badge: 0 },
+        { title: 'Encuestas', icon: '📊', screen: 'Polls', badge: 0 },
         { title: 'Mis Solicitudes', icon: '📝', screen: 'Solicitudes', badge: unreadSolicitudes },
         { title: 'Mis Cuotas', icon: '💸', screen: 'Dues', badge: 0 },
         { title: 'Documentos', icon: '📁', screen: 'Documents', badge: unreadDocs },
@@ -27,9 +38,13 @@ export default function MoreScreen() {
         { title: 'Accesibilidad', icon: '☉', screen: 'Accessibility', badge: 0 },
     ];
 
-    const handlePress = (item: typeof items[0]) => {
+    const handlePress = (item: any) => {
         if (item.screen === 'Documents') markDocsSeen();
-        navigation.navigate(item.screen);
+        if (item.isTab) {
+            navigation.navigate(item.screen);
+        } else {
+            navigation.navigate(item.screen);
+        }
     };
 
     return (

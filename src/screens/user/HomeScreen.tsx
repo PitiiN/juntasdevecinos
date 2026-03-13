@@ -22,7 +22,7 @@ export default function HomeScreen() {
     const unreadSolicitudes = mySolicitudes.filter(s => !s.seenByUser).length;
     const [speaking, setSpeaking] = useState<string | null>(null);
 
-    const unreadAvisos = Math.max(0, announcements.length - seenAvisosCount);
+    const unreadAvisos = Math.max(0, announcements.length - (seenAvisosCount || 0));
     const unreadDocs = Math.max(0, documents.length - seenDocsCount);
 
     useFocusEffect(
@@ -43,17 +43,17 @@ export default function HomeScreen() {
 
     const quickActions = [
         { title: 'Avisos', emoji: '📢', bg: '#FFF7ED', badge: unreadAvisos, onPress: () => goToTab('Avisos') },
-        { title: 'Directiva', emoji: '🏢', bg: '#F1F5F9', badge: 0, onPress: () => navigation.navigate('Más', { screen: 'Directiva' }) },
-        { title: 'Encuestas', emoji: '📊', bg: '#FFF7ED', badge: 0, onPress: () => { navigation.dispatch(CommonActions.navigate({ name: 'Avisos', params: { initialTab: 'encuestas' } })); } },
-        { title: 'Emergencia', emoji: '🆘', bg: '#F1F5F9', badge: 0, onPress: () => goToTab('S.O.S') },
+        { title: 'Encuestas', emoji: '📊', bg: '#F1F5F9', badge: 0, onPress: () => navigation.navigate('Más', { screen: 'Polls' }) },
         { title: 'Agenda', emoji: '📅', bg: '#FFF7ED', badge: 0, onPress: () => goToTab('Agenda') },
         { title: 'Solicitudes', emoji: '📝', bg: '#F1F5F9', badge: unreadSolicitudes, onPress: () => navigation.navigate('Más', { screen: 'Solicitudes' }) },
-        { title: 'Cuotas', emoji: '💸', bg: '#FFF7ED', badge: 0, onPress: () => navigation.navigate('Más', { screen: 'Dues' }) },
-        { title: 'Documentos', emoji: '📁', bg: '#F1F5F9', badge: unreadDocs, onPress: () => navigation.navigate('Más', { screen: 'Documents' }) },
         { title: 'Favores', emoji: '🤝', bg: '#FFF7ED', badge: 0, onPress: () => navigation.navigate('Más', { screen: 'Favores' }) },
-        { title: 'Mapa', emoji: '🗺️', bg: '#F1F5F9', badge: 0, onPress: () => navigation.navigate('Más', { screen: 'NeighborhoodMap' }) },
-        { title: 'Perfil', emoji: '👤', bg: '#FFF7ED', badge: 0, onPress: () => navigation.navigate('Más', { screen: 'Profile' }) },
-        { title: 'Accesibilidad', emoji: '☉', bg: '#F1F5F9', badge: 0, onPress: () => navigation.navigate('Más', { screen: 'Accessibility' }) },
+        { title: 'Cuotas', emoji: '💸', bg: '#F1F5F9', badge: 0, onPress: () => navigation.navigate('Más', { screen: 'Dues' }) },
+        { title: 'Mapa', emoji: '🗺️', bg: '#FFF7ED', badge: 0, onPress: () => navigation.navigate('Más', { screen: 'NeighborhoodMap' }) },
+        { title: 'Emergencia', emoji: '🆘', bg: '#F1F5F9', badge: 0, onPress: () => goToTab('S.O.S') },
+        { title: 'Documentos', emoji: '📁', bg: '#FFF7ED', badge: unreadDocs, onPress: () => navigation.navigate('Más', { screen: 'Documents' }) },
+        { title: 'Directiva', emoji: '🏢', bg: '#F1F5F9', badge: 0, onPress: () => navigation.navigate('Más', { screen: 'Directiva' }) },
+        { title: 'Accesibilidad', emoji: '☉', bg: '#FFF7ED', badge: 0, onPress: () => navigation.navigate('Más', { screen: 'Accessibility' }) },
+        { title: 'Perfil', emoji: '👤', bg: '#F1F5F9', badge: 0, onPress: () => navigation.navigate('Más', { screen: 'Profile' }) },
     ];
 
     return (

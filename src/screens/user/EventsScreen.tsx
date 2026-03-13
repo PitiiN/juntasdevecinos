@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Modal, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Modal, Platform, Linking, Alert, Dimensions } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import MapView, { Marker } from 'react-native-maps';
 import { useAppStore } from '../../lib/store';
 import { useAuth } from '../../context/AuthContext';
 
@@ -13,6 +14,13 @@ function formatDate(iso: string) {
     const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
     return `${days[d.getDay()]} ${d.getDate()} de ${MONTHS[d.getMonth()]}, ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
+
+const DEFAULT_REGION = {
+    latitude: -33.4920,
+    longitude: -70.6610,
+    latitudeDelta: 0.015,
+    longitudeDelta: 0.0121,
+};
 
 export default function EventsScreen() {
     const { user, viewMode } = useAuth();
@@ -40,7 +48,18 @@ export default function EventsScreen() {
     // Detail popup for users
     const [viewingEvent, setViewingEvent] = useState<any>(null);
 
-    const filteredEvents = allEvents.filter(e => e.month === selectedMonth);
+    // Map Popup State
+    const [showMapModal, setShowMapModal] = useState(false);
+    const [mapLocation, setMapLocation] = useState<{ lat: number; lng: number; title: string } | null>(null);
+
+    // Admin Pick Map State
+    const [showAdminMapPicker, setShowAdminMapPicker] = useState(false);
+    const [tempLat, setTempLat] = useState<number | null>(null);
+    const [tempLng, setTempLng] = useState<number | null>(null);
+
+    const filteredEvents = allEvents
+        .filter(e => e.month === selectedMonth)
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     const prevMonth = () => setSelectedMonth(m => m === 0 ? 11 : m - 1);
     const nextMonth = () => setSelectedMonth(m => m === 11 ? 0 : m + 1);
@@ -54,7 +73,9 @@ export default function EventsScreen() {
             emoji,
             description,
             date: dateStr,
-            month: eventDate.getMonth()
+            month: eventDate.getMonth(),
+            lat: tempLat || undefined,
+            lng: tempLng || undefined
         };
 
         if (editingEventId) {
@@ -74,6 +95,8 @@ export default function EventsScreen() {
         setDescription('');
         setEmoji('📅');
         setEventDate(new Date());
+        setTempLat(null);
+        setTempLng(null);
     };
 
     const handleEdit = (event: any) => {
@@ -83,6 +106,8 @@ export default function EventsScreen() {
         setEmoji(event.emoji);
         setDescription(event.description || '');
         setEventDate(new Date(event.date));
+        setTempLat(event.lat || null);
+        setTempLng(event.lng || null);
         setShowForm(true);
     };
 
@@ -91,6 +116,25 @@ export default function EventsScreen() {
             handleEdit(event);
         } else {
             setViewingEvent(event);
+        }
+    };
+
+    const handleOpenMaps = (event: any) => {
+        if (event.lat && event.lng) {
+            setMapLocation({ lat: event.lat, lng: event.lng, title: event.title });
+            setShowMapModal(true);
+        } else {
+            // Fallback to external maps if no coordinates
+            const url = Platform.select({
+                ios: `maps:0,0?q=${encodeURIComponent(event.location)}`,
+                android: `geo:0,0?q=${encodeURIComponent(event.location)}`
+            });
+            if (url) {
+                Linking.canOpenURL(url).then(supported => {
+                    if (supported) Linking.openURL(url);
+                    else Alert.alert('Error', 'No se pudo abrir la aplicación de mapas.');
+                }).catch(() => Alert.alert('Error', 'Error al abrir el mapa.'));
+            }
         }
     };
 
@@ -134,11 +178,11 @@ export default function EventsScreen() {
                 {showForm && (
                     <View style={s.form}>
                         <TextInput style={s.input} placeholder="Título" value={title} onChangeText={setTitle} placeholderTextColor="#94A3B8" />
-                        <TextInput style={s.input} placeholder="Lugar" value={location} onChangeText={setLocation} placeholderTextColor="#94A3B8" />
+                        <TextInput style={s.input} placeholder="Lugar (ej: Sede Vecinal)" value={location} onChangeText={setLocation} placeholderTextColor="#94A3B8" />
                         <TextInput style={[s.input, { minHeight: 60 }]} placeholder="Descripción (visible al pinchar)" value={description} onChangeText={setDescription} multiline textAlignVertical="top" placeholderTextColor="#94A3B8" />
 
                         <Text style={s.fieldLabel}>Fecha y hora</Text>
-                        <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
+                        <View style={{ flexDirection: 'row', gap: 10, marginBottom: 10 }}>
                             <TouchableOpacity style={[s.dateBtn, { flex: 1, marginBottom: 0 }]} onPress={() => { setPickerMode('date'); setShowDatePicker(true); }}>
                                 <Text style={s.dateBtnText}>📅 {eventDate.toLocaleDateString('es-CL')}</Text>
                             </TouchableOpacity>
@@ -149,6 +193,10 @@ export default function EventsScreen() {
                         {showDatePicker && (
                             <DateTimePicker value={eventDate} mode={pickerMode} display="default" onChange={handleDateChange} />
                         )}
+
+                        <TouchableOpacity style={[s.dateBtn, { borderStyle: 'dashed', marginTop: 4 }]} onPress={() => setShowAdminMapPicker(true)}>
+                            <Text style={s.dateBtnText}>📍 {tempLat ? 'Ubicación seleccionada' : 'Seleccionar ubicación en mapa (opcional)'}</Text>
+                        </TouchableOpacity>
 
                         <Text style={s.fieldLabel}>Emoji</Text>
                         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
@@ -182,7 +230,12 @@ export default function EventsScreen() {
                             <View style={s.info}>
                                 <Text style={s.cardTitle}>{e.title}</Text>
                                 <Text style={s.date}>{formatDate(e.date)}</Text>
-                                <Text style={s.location}>📍 {e.location}</Text>
+                                <TouchableOpacity onPress={(evt) => {
+                                    evt.stopPropagation();
+                                    handleOpenMaps(e);
+                                }}>
+                                    <Text style={s.location}>📍 {e.location}</Text>
+                                </TouchableOpacity>
                             </View>
                             {viewMode === 'admin' && (
                                 <TouchableOpacity onPress={() => removeEvent(e.id)} style={{ padding: 10 }}>
@@ -201,7 +254,9 @@ export default function EventsScreen() {
                         <Text style={s.modalEmoji}>{viewingEvent?.emoji}</Text>
                         <Text style={s.modalTitle}>{viewingEvent?.title}</Text>
                         <Text style={s.modalDate}>📅 {viewingEvent ? formatDate(viewingEvent.date) : ''}</Text>
-                        <Text style={s.modalLocation}>📍 {viewingEvent?.location}</Text>
+                        <TouchableOpacity onPress={() => handleOpenMaps(viewingEvent)}>
+                            <Text style={s.modalLocation}>📍 {viewingEvent?.location}</Text>
+                        </TouchableOpacity>
                         {viewingEvent?.description ? (
                             <View style={s.modalDescBox}>
                                 <Text style={s.modalDesc}>{viewingEvent.description}</Text>
@@ -212,6 +267,68 @@ export default function EventsScreen() {
                         </TouchableOpacity>
                     </View>
                 </TouchableOpacity>
+            </Modal>
+
+            {/* Inline Map Modal */}
+            <Modal visible={showMapModal} transparent animationType="slide">
+                <View style={s.modalOverlay}>
+                    <View style={[s.modalContent, { width: '90%', maxWidth: 500, height: 450, padding: 0, overflow: 'hidden' }]}>
+                        <View style={{ padding: 16, borderBottomWidth: 1, borderBottomColor: '#E2E8F0', width: '100%' }}>
+                            <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#1E3A5F', textAlign: 'center' }}>📍 Ubicación del Evento</Text>
+                            <Text style={{ fontSize: 14, color: '#64748B', textAlign: 'center' }}>{mapLocation?.title}</Text>
+                        </View>
+                        <MapView
+                            style={{ flex: 1, width: '100%' }}
+                            initialRegion={mapLocation ? {
+                                latitude: mapLocation.lat,
+                                longitude: mapLocation.lng,
+                                latitudeDelta: 0.005,
+                                longitudeDelta: 0.005,
+                            } : DEFAULT_REGION}
+                        >
+                            {mapLocation && (
+                                <Marker coordinate={{ latitude: mapLocation.lat, longitude: mapLocation.lng }} />
+                            )}
+                        </MapView>
+                        <TouchableOpacity style={{ padding: 16, backgroundColor: '#F1F5F9', width: '100%' }} onPress={() => setShowMapModal(false)}>
+                            <Text style={{ color: '#2563EB', fontWeight: 'bold', textAlign: 'center' }}>Cerrar Mapa</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Admin Map Picker */}
+            <Modal visible={showAdminMapPicker} transparent animationType="slide">
+                <View style={s.modalOverlay}>
+                    <View style={[s.modalContent, { width: '90%', maxWidth: 500, height: 550, padding: 0, overflow: 'hidden' }]}>
+                        <View style={{ padding: 16, borderBottomWidth: 1, borderBottomColor: '#E2E8F0', width: '100%' }}>
+                            <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#1E3A5F', textAlign: 'center' }}>Seleccionar Ubicación</Text>
+                            <Text style={{ fontSize: 13, color: '#64748B', textAlign: 'center' }}>Toca el mapa para situar el pin del evento</Text>
+                        </View>
+                        <MapView
+                            style={{ flex: 1, width: '100%' }}
+                            initialRegion={tempLat && tempLng ? {
+                                latitude: tempLat,
+                                longitude: tempLng,
+                                latitudeDelta: 0.005,
+                                longitudeDelta: 0.005,
+                            } : DEFAULT_REGION}
+                            onPress={(e) => {
+                                setTempLat(e.nativeEvent.coordinate.latitude);
+                                setTempLng(e.nativeEvent.coordinate.longitude);
+                            }}
+                        >
+                            {tempLat && tempLng && (
+                                <Marker coordinate={{ latitude: tempLat, longitude: tempLng }} />
+                            )}
+                        </MapView>
+                        <View style={{ flexDirection: 'row', gap: 10, padding: 16 }}>
+                            <TouchableOpacity style={[s.submitBtn, { flex: 1, backgroundColor: '#64748B' }]} onPress={() => setShowAdminMapPicker(false)}>
+                                <Text style={s.submitBtnText}>Confirmar</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
             </Modal>
         </SafeAreaView>
     );

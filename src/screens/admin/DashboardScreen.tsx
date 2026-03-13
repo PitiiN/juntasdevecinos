@@ -36,8 +36,15 @@ export default function DashboardScreen() {
         <SafeAreaView style={s.safe}>
             <ScrollView contentContainerStyle={s.scroll}>
                 <View style={s.header}>
-                    <Text style={s.headerTitle}>Panel de Administración</Text>
-                    <Text style={s.headerSub}>Junta de Vecinos UV 22 • San Miguel</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <View style={{ flex: 1 }}>
+                            <Text style={s.headerTitle}>Panel de Administración</Text>
+                            <Text style={s.headerSub}>{organizationName || 'Junta de Vecinos UV 22 • San Miguel'}</Text>
+                        </View>
+                        {organizationLogoUrl && (
+                            <Image source={{ uri: organizationLogoUrl }} style={s.logo} resizeMode="contain" />
+                        )}
+                    </View>
                 </View>
 
                 <Text style={s.section}>Accesos rápidos</Text>
