@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, Switch } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { useAppStore } from '../../lib/store';
+import { pushService } from '../../services/pushService';
 
 export default function AdminSettingsScreen({ navigation }: any) {
-    const { signOut, setViewMode } = useAuth();
-    const orgSettings = useAppStore(s => s.orgSettings);
-    const updateOrgSettings = useAppStore(s => s.updateOrgSettings);
+    const { signOut, setViewMode, role, user, organizationId } = useAuth();
+    const orgSettings = useAppStore((state) => state.orgSettings);
+    const updateOrgSettings = useAppStore((state) => state.updateOrgSettings);
 
     const [name, setName] = useState(orgSettings.name);
     const [address, setAddress] = useState(orgSettings.address);
@@ -18,67 +19,34 @@ export default function AdminSettingsScreen({ navigation }: any) {
     const handleSave = () => {
         updateOrgSettings({ name, address, phone, social });
         setEditing(false);
-        Alert.alert('✅ Guardado', 'La configuración se ha actualizado correctamente.');
+        Alert.alert('Guardado', 'La configuracion se actualizo correctamente.');
     };
 
     const sendTestNotification = async () => {
         try {
-            const Notifications = require('expo-notifications');
-            // Check and request permissions explicitly
-            const { status: existingStatus } = await Notifications.getPermissionsAsync();
-            let finalStatus = existingStatus;
-
-            if (existingStatus !== 'granted') {
-                const { status } = await Notifications.requestPermissionsAsync();
-                finalStatus = status;
-            }
-
-            if (finalStatus !== 'granted') {
-                Alert.alert('Permiso Denegado', 'Debes habilitar las notificaciones para esta aplicación en los ajustes de tu teléfono para poder probarlas.');
+            if (!user?.id || !organizationId) {
+                Alert.alert('No disponible', 'Necesitas una organizacion activa para probar notificaciones.');
                 return;
             }
 
-            const Constants = require('expo-constants').default;
-
-            // Si estamos en la app de pruebas Expo Go (deshabilitado en v53) -> Mandamos Local
-            if (Constants.appOwnership === 'expo') {
-                await Notifications.scheduleNotificationAsync({
-                    content: {
-                        title: '✅ ¡Prueba Local Exitosa!',
-                        body: 'El motor de notificaciones funciona. Para probar notificaciones originadas en la nube, instala la App definitiva (APK/IPA).',
-                        data: { test: true },
-                        sound: true,
-                    },
-                    trigger: null,
-                });
-                Alert.alert('Notificación programada 🚀', 'Se envió de forma local porque usamos Expo Go.');
-                return;
-            }
-
-            // Si es un APK / IPA compilado nativamente -> Mandamos Remota por los servidores de Expo
-            const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? '2b9db0c5-4372-43e8-96e7-800ebebf6faf';
-            const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
-            const token = tokenData.data;
-
-            await fetch('https://exp.host/--/api/v2/push/send', {
-                method: 'POST',
-                headers: {
-                    Accept: 'application/json',
-                    'Accept-encoding': 'gzip, deflate',
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    to: token,
-                    sound: 'default',
-                    title: '🚀 ¡Prueba de Internet Exitosa!',
-                    body: 'El token de tu dispositivo viajó a la nube y regresó a este teléfono de manera nativa y cifrada.',
-                    data: { test: true },
-                }),
+            const result = await pushService.sendAdminPushTest({
+                userId: user.id,
+                organizationId,
             });
-            Alert.alert('Enviada desde la Nube ☁️', 'Esta ya es una notificación de empuje real.');
 
-        } catch (e: any) {
-            Alert.alert('Error', 'Falló el envío de la notificación de prueba.\n' + e.message);
+            if (result.mode === 'local-preview') {
+                Alert.alert('Prueba local enviada', result.message);
+                return;
+            }
+
+            if (result.mode === 'unsupported') {
+                Alert.alert('Push remotas no disponibles', result.message);
+                return;
+            }
+
+            Alert.alert('Push enviada', result.message);
+        } catch (error: any) {
+            Alert.alert('Error', 'Fallo el envio de la notificacion de prueba.\n' + (error?.message || 'Error desconocido'));
         }
     };
 
@@ -86,23 +54,23 @@ export default function AdminSettingsScreen({ navigation }: any) {
         <SafeAreaView style={s.safe}>
             <ScrollView contentContainerStyle={s.scroll}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={s.back}>
-                    <Text style={s.backText}>← Volver</Text>
+                    <Text style={s.backText}>Volver</Text>
                 </TouchableOpacity>
-                <Text style={s.title}>⚙️ Configuración JJVV</Text>
-                <Text style={s.subtitle}>Administra la información de tu organización</Text>
+                <Text style={s.title}>Configuracion JJVV</Text>
+                <Text style={s.subtitle}>Administra la informacion de tu organizacion</Text>
 
                 <View style={s.card}>
-                    <Text style={s.label}>Nombre de la organización</Text>
+                    <Text style={s.label}>Nombre de la organizacion</Text>
                     <TextInput style={s.input} value={name} onChangeText={setName} editable={editing} placeholder="Nombre JJVV" />
                 </View>
 
                 <View style={s.card}>
-                    <Text style={s.label}>Dirección</Text>
-                    <TextInput style={s.input} value={address} onChangeText={setAddress} editable={editing} placeholder="Dirección de la sede" />
+                    <Text style={s.label}>Direccion</Text>
+                    <TextInput style={s.input} value={address} onChangeText={setAddress} editable={editing} placeholder="Direccion de la sede" />
                 </View>
 
                 <View style={s.card}>
-                    <Text style={s.label}>Teléfono de contacto</Text>
+                    <Text style={s.label}>Telefono de contacto</Text>
                     <TextInput style={s.input} value={phone} onChangeText={setPhone} editable={editing} placeholder="Ej: +56 9 1234 5678" keyboardType="phone-pad" />
                 </View>
 
@@ -114,30 +82,51 @@ export default function AdminSettingsScreen({ navigation }: any) {
                 {editing ? (
                     <View style={s.btnRow}>
                         <TouchableOpacity style={s.saveBtn} onPress={handleSave}>
-                            <Text style={s.saveBtnText}>💾 Guardar cambios</Text>
+                            <Text style={s.saveBtnText}>Guardar cambios</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity style={s.cancelBtn} onPress={() => { setEditing(false); setName(orgSettings.name); setAddress(orgSettings.address); setPhone(orgSettings.phone); setSocial(orgSettings.social); }}>
+                        <TouchableOpacity
+                            style={s.cancelBtn}
+                            onPress={() => {
+                                setEditing(false);
+                                setName(orgSettings.name);
+                                setAddress(orgSettings.address);
+                                setPhone(orgSettings.phone);
+                                setSocial(orgSettings.social);
+                            }}
+                        >
                             <Text style={s.cancelBtnText}>Cancelar</Text>
                         </TouchableOpacity>
                     </View>
                 ) : (
                     <TouchableOpacity style={s.editBtn} onPress={() => setEditing(true)}>
-                        <Text style={s.editBtnText}>✏️ Editar información</Text>
+                        <Text style={s.editBtnText}>Editar informacion</Text>
                     </TouchableOpacity>
                 )}
 
                 <View style={s.divider} />
 
                 <TouchableOpacity style={s.testPushBtn} onPress={sendTestNotification}>
-                    <Text style={s.testPushText}>🔔 Enviar Notificación Push de Prueba</Text>
+                    <Text style={s.testPushText}>Enviar notificacion push de prueba</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={s.actionRow} onPress={() => setViewMode('user')}>
-                    <Text style={s.actionIcon}>👤</Text><Text style={s.actionText}>Cambiar a vista Usuario</Text><Text style={s.actionArrow}>›</Text>
-                </TouchableOpacity>
+                {role === 'superadmin' && (
+                    <TouchableOpacity style={s.actionRow} onPress={() => setViewMode('user')}>
+                        <Text style={s.actionIcon}>Usuario</Text>
+                        <Text style={s.actionText}>Cambiar a vista usuario</Text>
+                        <Text style={s.actionArrow}>{'>'}</Text>
+                    </TouchableOpacity>
+                )}
 
-                <TouchableOpacity style={s.logoutBtn} onPress={() => Alert.alert('Cerrar sesión', '¿Estás seguro?', [{ text: 'Cancelar' }, { text: 'Cerrar sesión', style: 'destructive', onPress: signOut }])}>
-                    <Text style={s.logoutText}>🚪 Cerrar sesión</Text>
+                <TouchableOpacity
+                    style={s.logoutBtn}
+                    onPress={() =>
+                        Alert.alert('Cerrar sesion', 'Estas seguro?', [
+                            { text: 'Cancelar' },
+                            { text: 'Cerrar sesion', style: 'destructive', onPress: signOut },
+                        ])
+                    }
+                >
+                    <Text style={s.logoutText}>Cerrar sesion</Text>
                 </TouchableOpacity>
             </ScrollView>
         </SafeAreaView>
@@ -153,7 +142,16 @@ const s = StyleSheet.create({
     subtitle: { fontSize: 14, color: '#64748B', marginBottom: 20 },
     card: { backgroundColor: '#FFFFFF', borderRadius: 12, padding: 16, marginBottom: 10, elevation: 1 },
     label: { fontSize: 12, color: '#94A3B8', fontWeight: '600', textTransform: 'uppercase', marginBottom: 8 },
-    input: { fontSize: 16, color: '#0F172A', fontWeight: '500', backgroundColor: 'transparent', borderRadius: 8, padding: 10, borderWidth: 1, borderColor: '#E2E8F0' },
+    input: {
+        fontSize: 16,
+        color: '#0F172A',
+        fontWeight: '500',
+        backgroundColor: 'transparent',
+        borderRadius: 8,
+        padding: 10,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+    },
     btnRow: { gap: 8, marginTop: 16 },
     saveBtn: { backgroundColor: '#22C55E', borderRadius: 12, padding: 16, alignItems: 'center' },
     saveBtnText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 16 },
@@ -162,12 +160,36 @@ const s = StyleSheet.create({
     editBtn: { backgroundColor: '#2563EB', borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 16 },
     editBtnText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 16 },
     divider: { height: 1, backgroundColor: '#E2E8F0', marginVertical: 20 },
-    actionRow: { backgroundColor: '#FFFFFF', borderRadius: 12, padding: 14, marginBottom: 8, flexDirection: 'row', alignItems: 'center', elevation: 1 },
-    actionIcon: { fontSize: 20, marginRight: 12 },
+    actionRow: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 12,
+        padding: 14,
+        marginBottom: 8,
+        flexDirection: 'row',
+        alignItems: 'center',
+        elevation: 1,
+    },
+    actionIcon: { fontSize: 14, marginRight: 12, color: '#334155', fontWeight: '700' },
     actionText: { flex: 1, fontSize: 15, fontWeight: '500', color: '#334155' },
     actionArrow: { fontSize: 22, color: '#CBD5E1' },
-    testPushBtn: { backgroundColor: '#F0F9FF', borderRadius: 12, padding: 16, alignItems: 'center', marginBottom: 8, borderWidth: 1, borderColor: '#BAE6FD' },
+    testPushBtn: {
+        backgroundColor: '#F0F9FF',
+        borderRadius: 12,
+        padding: 16,
+        alignItems: 'center',
+        marginBottom: 8,
+        borderWidth: 1,
+        borderColor: '#BAE6FD',
+    },
     testPushText: { color: '#0369A1', fontWeight: 'bold', fontSize: 16 },
-    logoutBtn: { backgroundColor: '#FEF2F2', borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 8, borderWidth: 1, borderColor: '#FECACA' },
+    logoutBtn: {
+        backgroundColor: '#FEF2F2',
+        borderRadius: 12,
+        padding: 16,
+        alignItems: 'center',
+        marginTop: 8,
+        borderWidth: 1,
+        borderColor: '#FECACA',
+    },
     logoutText: { color: '#DC2626', fontWeight: 'bold', fontSize: 16 },
 });

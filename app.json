@@ -21,9 +21,16 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#1E3A5F"
       },
-      "package": "com.jjvv.mobile",
-      "permissions": ["android.permission.CALL_PHONE"]
+      "package": "com.jjvv.mobile"
     },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "defaultChannel": "default"
+        }
+      ]
+    ],
     "extra": {
       "eas": {
         "projectId": "2b9db0c5-4372-43e8-96e7-800ebebf6faf"

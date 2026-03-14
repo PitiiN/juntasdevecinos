@@ -1,39 +1,47 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, TextInput, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 
 export default function ProfileScreen({ navigation }: any) {
-    const { user } = useAuth();
+    const { user, organizationName, pendingMembershipRequest } = useAuth();
     const fullName = user?.user_metadata?.full_name || 'Vecino';
     const email = user?.email || '';
     const createdAt = user?.created_at ? new Date(user.created_at).toLocaleDateString('es-CL') : '';
+    const organizationLabel = organizationName || pendingMembershipRequest?.organizationName || 'Sin organizacion aprobada';
 
-
-    // Password modal
     const [showPasswordModal, setShowPasswordModal] = useState(false);
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [passwordLoading, setPasswordLoading] = useState(false);
 
-    // Address modal
     const [showAddressModal, setShowAddressModal] = useState(false);
     const [address, setAddress] = useState('');
     const [addressLoading, setAddressLoading] = useState(false);
 
-    React.useEffect(() => {
-        fetchProfile();
+    useEffect(() => {
+        void fetchProfile();
     }, [user]);
 
     const fetchProfile = async () => {
         if (!user) return;
         try {
-            const { data, error } = await supabase.from('profiles').select('address').eq('user_id', user.id).single();
-            if (data) setAddress(data.address || '');
-            if (error && error.code !== 'PGRST116') console.warn('Error fetching profile:', error);
-        } catch (err) {
-            console.error('Fetch profile err:', err);
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('address')
+                .eq('user_id', user.id)
+                .single();
+
+            if (data) {
+                setAddress(data.address || '');
+            }
+
+            if (error && error.code !== 'PGRST116') {
+                console.warn('Error fetching profile:', error);
+            }
+        } catch (error) {
+            console.error('Fetch profile err:', error);
         }
     };
 
@@ -45,37 +53,39 @@ export default function ProfileScreen({ navigation }: any) {
                 .from('profiles')
                 .update({ address: address.trim() })
                 .eq('user_id', user.id);
-            
+
             if (error) {
                 Alert.alert('Error', error.message);
             } else {
-                Alert.alert('✅ Dirección actualizada', 'Tu dirección ha sido guardada exitosamente.');
+                Alert.alert('Direccion actualizada', 'Tu direccion fue guardada correctamente.');
                 setShowAddressModal(false);
             }
-        } catch (err: any) {
-            Alert.alert('Error', err.message || 'Error inesperado');
+        } catch (error: any) {
+            Alert.alert('Error', error.message || 'Error inesperado');
         } finally {
             setAddressLoading(false);
         }
     };
 
-
     const handleChangePassword = async () => {
         if (!newPassword || newPassword.length < 6) {
-            Alert.alert('Error', 'La nueva contraseña debe tener al menos 6 caracteres.');
+            Alert.alert('Error', 'La nueva contrasena debe tener al menos 6 caracteres.');
             return;
         }
+
         if (newPassword !== confirmPassword) {
-            Alert.alert('Error', 'Las contraseñas no coinciden.');
+            Alert.alert('Error', 'Las contrasenas no coinciden.');
             return;
         }
+
         setPasswordLoading(true);
         const { error } = await supabase.auth.updateUser({ password: newPassword });
         setPasswordLoading(false);
+
         if (error) {
             Alert.alert('Error', error.message);
         } else {
-            Alert.alert('✅ Contraseña actualizada', 'Tu contraseña ha sido cambiada exitosamente.');
+            Alert.alert('Contrasena actualizada', 'Tu contrasena fue cambiada correctamente.');
             setShowPasswordModal(false);
             setNewPassword('');
             setConfirmPassword('');
@@ -86,7 +96,7 @@ export default function ProfileScreen({ navigation }: any) {
         <SafeAreaView style={s.safe}>
             <ScrollView contentContainerStyle={s.scroll}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={s.back}>
-                    <Text style={s.backText}>← Volver</Text>
+                    <Text style={s.backText}>Volver</Text>
                 </TouchableOpacity>
 
                 <View style={s.avatarContainer}>
@@ -97,7 +107,7 @@ export default function ProfileScreen({ navigation }: any) {
                 </View>
 
                 <View style={s.card}>
-                    <Text style={s.label}>Correo electrónico</Text>
+                    <Text style={s.label}>Correo electronico</Text>
                     <Text style={s.value}>{email}</Text>
                 </View>
 
@@ -107,12 +117,12 @@ export default function ProfileScreen({ navigation }: any) {
                 </View>
 
                 <TouchableOpacity style={s.card} onPress={() => setShowAddressModal(true)}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <View style={s.inlineRow}>
                         <View style={{ flex: 1 }}>
-                            <Text style={s.label}>Dirección</Text>
-                            <Text style={s.value}>{address || 'No especificada (Toca para editar)'}</Text>
+                            <Text style={s.label}>Direccion</Text>
+                            <Text style={s.value}>{address || 'No especificada (toca para editar)'}</Text>
                         </View>
-                        <Text style={{ fontSize: 18 }}>✏️</Text>
+                        <Text style={s.editIcon}>Editar</Text>
                     </View>
                 </TouchableOpacity>
 
@@ -122,21 +132,19 @@ export default function ProfileScreen({ navigation }: any) {
                 </View>
 
                 <View style={s.card}>
-                    <Text style={s.label}>Unidad Vecinal</Text>
-                    <Text style={s.value}>UV 22 • San Miguel</Text>
+                    <Text style={s.label}>Organizacion</Text>
+                    <Text style={s.value}>{organizationLabel}</Text>
                 </View>
 
-
                 <TouchableOpacity style={s.resetBtn} onPress={() => setShowPasswordModal(true)}>
-                    <Text style={s.resetText}>🔑 Cambiar Contraseña</Text>
+                    <Text style={s.resetText}>Cambiar contrasena</Text>
                 </TouchableOpacity>
 
-                {/* Address Modal */}
                 <Modal visible={showAddressModal} transparent animationType="fade">
                     <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => setShowAddressModal(false)}>
                         <View style={s.modalContent} onStartShouldSetResponder={() => true}>
-                            <Text style={s.modalTitle}>Editar Dirección</Text>
-                            <Text style={s.modalSub}>Ingresa tu dirección particular</Text>
+                            <Text style={s.modalTitle}>Editar direccion</Text>
+                            <Text style={s.modalSub}>Ingresa tu direccion particular</Text>
                             <TextInput
                                 style={s.input}
                                 placeholder="Ej: Calle Siempre Viva 123"
@@ -145,7 +153,7 @@ export default function ProfileScreen({ navigation }: any) {
                                 onChangeText={setAddress}
                             />
                             <TouchableOpacity style={[s.confirmBtn, addressLoading && { opacity: 0.6 }]} onPress={handleSaveAddress} disabled={addressLoading}>
-                                <Text style={s.confirmText}>{addressLoading ? 'Guardando...' : 'Guardar dirección'}</Text>
+                                <Text style={s.confirmText}>{addressLoading ? 'Guardando...' : 'Guardar direccion'}</Text>
                             </TouchableOpacity>
                             <TouchableOpacity onPress={() => setShowAddressModal(false)} style={s.cancelBtn}>
                                 <Text style={s.cancelText}>Cancelar</Text>
@@ -154,16 +162,14 @@ export default function ProfileScreen({ navigation }: any) {
                     </TouchableOpacity>
                 </Modal>
 
-
-                {/* Password Modal */}
                 <Modal visible={showPasswordModal} transparent animationType="fade">
                     <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => setShowPasswordModal(false)}>
                         <View style={s.modalContent} onStartShouldSetResponder={() => true}>
-                            <Text style={s.modalTitle}>Cambiar contraseña</Text>
-                            <Text style={s.modalSub}>Ingresa tu nueva contraseña</Text>
+                            <Text style={s.modalTitle}>Cambiar contrasena</Text>
+                            <Text style={s.modalSub}>Ingresa tu nueva contrasena</Text>
                             <TextInput
                                 style={s.input}
-                                placeholder="Nueva contraseña"
+                                placeholder="Nueva contrasena"
                                 placeholderTextColor="#94A3B8"
                                 value={newPassword}
                                 onChangeText={setNewPassword}
@@ -171,14 +177,14 @@ export default function ProfileScreen({ navigation }: any) {
                             />
                             <TextInput
                                 style={s.input}
-                                placeholder="Confirmar nueva contraseña"
+                                placeholder="Confirmar nueva contrasena"
                                 placeholderTextColor="#94A3B8"
                                 value={confirmPassword}
                                 onChangeText={setConfirmPassword}
                                 secureTextEntry
                             />
                             <TouchableOpacity style={[s.confirmBtn, passwordLoading && { opacity: 0.6 }]} onPress={handleChangePassword} disabled={passwordLoading}>
-                                <Text style={s.confirmText}>{passwordLoading ? 'Guardando...' : 'Cambiar contraseña'}</Text>
+                                <Text style={s.confirmText}>{passwordLoading ? 'Guardando...' : 'Cambiar contrasena'}</Text>
                             </TouchableOpacity>
                             <TouchableOpacity onPress={() => setShowPasswordModal(false)} style={s.cancelBtn}>
                                 <Text style={s.cancelText}>Cancelar</Text>
@@ -203,6 +209,8 @@ const s = StyleSheet.create({
     card: { backgroundColor: '#FFFFFF', borderRadius: 12, padding: 16, marginBottom: 10, elevation: 1 },
     label: { fontSize: 12, color: '#94A3B8', fontWeight: '600', textTransform: 'uppercase', marginBottom: 4 },
     value: { fontSize: 16, color: '#0F172A', fontWeight: '500' },
+    inlineRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    editIcon: { fontSize: 13, color: '#2563EB', fontWeight: '700' },
     resetBtn: { backgroundColor: '#FEF3C7', borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 10, borderWidth: 1, borderColor: '#FDE68A' },
     resetText: { color: '#92400E', fontWeight: 'bold', fontSize: 16 },
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 30 },

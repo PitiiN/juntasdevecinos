@@ -8,11 +8,12 @@ import { useAccessibility } from '../context/AccessibilityContext';
 import AuthStack from './AuthStack';
 import UserTabs from './UserTabs';
 import AdminTabs from './AdminTabs';
+import PendingApprovalScreen from '../screens/auth/PendingApprovalScreen';
 
 const prefix = Linking.createURL('/');
 
 export default function RootNavigator() {
-    const { session, isLoading, isAdmin, viewMode } = useAuth();
+    const { session, isLoading, isAdmin, isSuperadmin, viewMode, hasApprovedAccess } = useAuth();
     const { fontScale, highContrast } = useAccessibility();
     const [isReady, setIsReady] = useState(false);
 
@@ -53,7 +54,9 @@ export default function RootNavigator() {
         <NavigationContainer linking={linking} theme={customTheme as any}>
             {!session ? (
                 <AuthStack />
-            ) : isAdmin && viewMode === 'admin' ? (
+            ) : !hasApprovedAccess ? (
+                <PendingApprovalScreen />
+            ) : isAdmin && (!isSuperadmin || viewMode === 'admin') ? (
                 <AdminTabs />
             ) : (
                 <UserTabs />

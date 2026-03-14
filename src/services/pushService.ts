@@ -1,110 +1,207 @@
 import { supabase } from '../lib/supabase';
 
+type NotificationType = 'announcement' | 'alert' | 'event' | 'ticket' | 'dues' | 'finance' | 'poll';
+
+type PushRegistrationResult =
+    | { status: 'registered'; token: string }
+    | { status: 'unsupported'; message: string }
+    | { status: 'permission_denied'; message: string };
+
+type PushTestResult =
+    | { mode: 'local-preview'; message: string }
+    | { mode: 'remote-push'; message: string }
+    | { mode: 'unsupported'; message: string };
+
+const getRuntimeContext = () => {
+    const Constants = require('expo-constants').default;
+    const { Platform } = require('react-native');
+
+    return {
+        Constants,
+        Platform,
+        isWeb: Platform.OS === 'web',
+        isExpoGo:
+            Constants.appOwnership === 'expo' ||
+            Constants.executionEnvironment === 'storeClient',
+        projectId:
+            Constants.expoConfig?.extra?.eas?.projectId ??
+            '2b9db0c5-4372-43e8-96e7-800ebebf6faf',
+    };
+};
+
+const ensureNotificationPermissions = async () => {
+    const Notifications = require('expo-notifications');
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus;
+
+    if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+    }
+
+    return finalStatus === 'granted';
+};
+
 export const pushService = {
-    // Register push token
-    async registerPushToken(userId: string, organizationId: string) {
-        const Constants = require('expo-constants').default;
-        const { Platform } = require('react-native');
-        if (Platform.OS === 'web' || Constants.appOwnership === 'expo') {
-            console.log('Skipping push token registration in Web or Expo Go (SDK 53 limitation).');
-            return;
+    async registerPushToken(userId: string, organizationId: string): Promise<PushRegistrationResult> {
+        const { Platform, isWeb, isExpoGo, projectId } = getRuntimeContext();
+
+        if (isWeb) {
+            return {
+                status: 'unsupported',
+                message: 'Las notificaciones push no estan disponibles en web.',
+            };
+        }
+
+        if (isExpoGo) {
+            return {
+                status: 'unsupported',
+                message: 'Expo Go no soporta push remotas en Android desde SDK 53. Usa una development build o una build publicada.',
+            };
+        }
+
+        const hasPermission = await ensureNotificationPermissions();
+        if (!hasPermission) {
+            return {
+                status: 'permission_denied',
+                message: 'Debes habilitar las notificaciones para este dispositivo.',
+            };
         }
 
         const Notifications = require('expo-notifications');
-        const { status: existingStatus } = await Notifications.getPermissionsAsync();
-        let finalStatus = existingStatus;
+        const token = (await Notifications.getExpoPushTokenAsync({
+            projectId,
+        })).data;
 
-        if (existingStatus !== 'granted') {
-            const { status } = await Notifications.requestPermissionsAsync();
-            finalStatus = status;
+        const { error } = await supabase
+            .from('push_tokens')
+            .upsert({
+                user_id: userId,
+                organization_id: organizationId,
+                platform: Platform.OS,
+                token,
+                enabled: true,
+                last_seen_at: new Date().toISOString(),
+            }, {
+                onConflict: 'platform,token',
+            });
+
+        if (error) {
+            throw error;
         }
 
-        if (finalStatus !== 'granted') {
-            console.log('Failed to get push token for push notification!');
-            return;
-        }
-
-        try {
-            const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? '2b9db0c5-4372-43e8-96e7-800ebebf6faf';
-            const token = (await Notifications.getExpoPushTokenAsync({
-                projectId,
-            })).data;
-
-            console.log('Push token:', token);
-
-            // Save to Supabase
-            const { error } = await supabase
-                .from('push_tokens')
-                .upsert({
-                    user_id: userId,
-                    organization_id: organizationId,
-                    platform: Platform.OS,
-                    token: token,
-                    enabled: true,
-                    last_seen_at: new Date().toISOString()
-                }, {
-                    onConflict: 'platform,token'
-                });
-
-            if (error) throw error;
-
-        } catch (e) {
-            console.error('Error getting or saving push token:', e);
-        }
+        return { status: 'registered', token };
     },
 
-    // Send a push notification by calling Edge Function
     async sendPushNotification(payload: {
         organization_id: string;
         title: string;
         body: string;
-        data?: any;
+        type: NotificationType;
+        deep_link?: string;
+        payload?: Record<string, unknown>;
     }) {
-        const { data, error } = await supabase.functions.invoke('send-push', {
-            body: payload
+        const normalizedPayload = {
+            ...payload,
+            type: payload.type === 'poll' ? 'announcement' : payload.type,
+        };
+
+        const { data, error } = await supabase.functions.invoke('send_push', {
+            body: normalizedPayload,
         });
-        if (error) throw error;
+
+        if (error) {
+            throw error;
+        }
+
         return data;
     },
 
-    // Broadcast a push notification (Simulated for all users for MVP purposes without Edge Functions)
-    async broadcastPushNotification(title: string, body: string, data?: any) {
-        try {
-            const Constants = require('expo-constants').default;
+    async broadcastPushNotification(
+        payloadOrTitle: {
+            organization_id: string;
+            title: string;
+            body: string;
+            type: NotificationType;
+            deep_link?: string;
+            payload?: Record<string, unknown>;
+        } | string,
+        legacyBody?: string,
+        legacyPayload?: { type?: NotificationType; [key: string]: unknown }
+    ) {
+        if (typeof payloadOrTitle === 'string') {
+            console.warn('broadcastPushNotification without organization_id is blocked for security reasons.');
+            return null;
+        }
+
+        return this.sendPushNotification(payloadOrTitle);
+    },
+
+    async sendAdminPushTest(params: { userId: string; organizationId: string }): Promise<PushTestResult> {
+        const { isWeb, isExpoGo } = getRuntimeContext();
+
+        if (isWeb) {
+            return {
+                mode: 'unsupported',
+                message: 'Las notificaciones push no se pueden probar desde web.',
+            };
+        }
+
+        if (isExpoGo) {
             const Notifications = require('expo-notifications');
-            if (Constants.appOwnership === 'expo') {
-                await Notifications.scheduleNotificationAsync({
-                    content: { title, body, data, sound: true, },
-                    trigger: null,
-                });
-                return;
+            const hasPermission = await ensureNotificationPermissions();
+
+            if (!hasPermission) {
+                throw new Error('Debes habilitar las notificaciones para esta aplicacion.');
             }
 
-            // Real Production Broadcast
-            // 1. In a real-world scenario with backend Edge Functions:
-            // return this.sendPushNotification({ organization_id: '...', title, body, data });
-
-            // 2. For MVP simulating a global broadcast directly from the Admin's device:
-            const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? '2b9db0c5-4372-43e8-96e7-800ebebf6faf';
-            const adminTokenInfo = await Notifications.getExpoPushTokenAsync({ projectId });
-
-            await fetch('https://exp.host/--/api/v2/push/send', {
-                method: 'POST',
-                headers: {
-                    Accept: 'application/json',
-                    'Accept-encoding': 'gzip, deflate',
-                    'Content-Type': 'application/json',
+            await Notifications.scheduleNotificationAsync({
+                content: {
+                    title: 'Prueba local JJVV',
+                    body: 'Expo Go no soporta push remotas en Android. Esta prueba es solo local.',
+                    data: { scope: 'local-preview' },
+                    sound: true,
                 },
-                body: JSON.stringify({
-                    to: adminTokenInfo.data, // Currently sending ONLY to the Admin for testing/simulation due to lack of a fully populated User Push Token database fetching logic. In a real deployment, this would be an array of all user tokens fetched from the `push_tokens` table.
-                    sound: 'default',
-                    title: title,
-                    body: body,
-                    data: data || {},
-                }),
+                trigger: null,
             });
-        } catch (error) {
-            console.error('Error broadcasting notification:', error);
+
+            return {
+                mode: 'local-preview',
+                message: 'Se envio una notificacion local. Para push remotas reales usa una development build o una build publicada.',
+            };
         }
-    }
+
+        const registrationResult = await this.registerPushToken(params.userId, params.organizationId);
+        if (registrationResult.status === 'unsupported') {
+            return {
+                mode: 'unsupported',
+                message: registrationResult.message,
+            };
+        }
+
+        if (registrationResult.status === 'permission_denied') {
+            throw new Error(registrationResult.message);
+        }
+
+        try {
+            await this.sendPushNotification({
+                organization_id: params.organizationId,
+                title: 'Prueba push JJVV',
+                body: 'Esta es una notificacion push real enviada desde la plataforma JJVV.',
+                type: 'announcement',
+                payload: { test: true },
+            });
+        } catch (error: any) {
+            const message = String(error?.message || '');
+            if (message.includes('FunctionsHttpError') || message.includes('non-2xx')) {
+                throw new Error('La funcion send_push no esta disponible o rechazo la solicitud. Despliegala nuevamente antes de probar.');
+            }
+            throw error;
+        }
+
+        return {
+            mode: 'remote-push',
+            message: 'Se envio una notificacion push real al dispositivo actual.',
+        };
+    },
 };

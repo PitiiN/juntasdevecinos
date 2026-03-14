@@ -101,6 +101,17 @@ export const favorService = {
                     onUpdate();
                 }
             )
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'favor_replies'
+                },
+                () => {
+                    onUpdate();
+                }
+            )
             .subscribe();
     }
 };

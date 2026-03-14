@@ -6,7 +6,10 @@
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "security:baseline": "node scripts/security/live-baseline-validation.mjs",
+    "security:matrix": "node scripts/security/live-matrix-validation.mjs",
+    "security:matrix:users": "node scripts/security/live-matrix-validation.mjs --provision-users"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",

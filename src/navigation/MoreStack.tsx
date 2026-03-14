@@ -13,6 +13,7 @@ import FavoresScreen from '../screens/user/FavoresScreen';
 import DirectivaScreen from '../screens/user/DirectivaScreen';
 import PollsScreen from '../screens/user/PollsScreen';
 import VoucherScreen from '../screens/shared/VoucherScreen';
+import DeleteAccountScreen from '../screens/shared/DeleteAccountScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -32,6 +33,7 @@ export default function MoreStack() {
             <Stack.Screen name="Directiva" component={DirectivaScreen} />
             <Stack.Screen name="Polls" component={PollsScreen} />
             <Stack.Screen name="Voucher" component={VoucherScreen} />
+            <Stack.Screen name="DeleteAccount" component={DeleteAccountScreen} />
         </Stack.Navigator>
     );
 }

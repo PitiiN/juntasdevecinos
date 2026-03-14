@@ -1,171 +1,258 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, TextInput, Alert } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, TextInput, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useAppStore } from '../../lib/store';
+import { useFocusEffect } from '@react-navigation/native';
 import { poiService } from '../../services/poiService';
 import { useAuth } from '../../context/AuthContext';
+import { ticketService, TicketComment, TicketItem } from '../../services/ticketService';
 
 export default function SolicitudDetailScreen({ route, navigation }: any) {
-    const { id, isAdmin } = route.params;
-    const { user, organizationId } = useAuth();
-    const { solicitudes, updateSolicitudStatus, addSolicitudReply, markSolicitudSeen, addMapPin } = useAppStore();
-    const solicitud = solicitudes.find(s => s.id === id);
+    const { id, isAdmin: requestedAdmin } = route.params;
+    const { user, organizationId, isAdmin, viewMode } = useAuth();
+    const [ticket, setTicket] = useState<TicketItem | null>(null);
+    const [comments, setComments] = useState<TicketComment[]>([]);
     const [reply, setReply] = useState('');
+    const [loading, setLoading] = useState(true);
+    const [sending, setSending] = useState(false);
+    const isAdminContext = requestedAdmin && isAdmin && viewMode === 'admin';
 
-    useEffect(() => {
-        if (solicitud) markSolicitudSeen(id, isAdmin ? 'admin' : 'user');
-    }, [id]);
+    const loadTicket = useCallback(async () => {
+        if (!organizationId) {
+            setTicket(null);
+            setComments([]);
+            setLoading(false);
+            return;
+        }
 
-    if (!solicitud) return <SafeAreaView style={s.safe}><Text style={s.noData}>Solicitud no encontrada</Text></SafeAreaView>;
+        setLoading(true);
+        try {
+            const [ticketData, commentsData] = await Promise.all([
+                ticketService.getTicketById(id, organizationId, isAdminContext ? 'admin' : 'user'),
+                ticketService.getTicketComments(id),
+                ticketService.markSeen(id, isAdminContext ? 'admin' : 'user'),
+            ]);
 
-    const getStatusColor = (st: string) => {
-        switch (st) { case 'Abierta': return '#EF4444'; case 'En proceso': return '#F59E0B'; case 'Resuelta': return '#22C55E'; default: return '#94A3B8'; }
-    };
+            setTicket(ticketData);
+            setComments(commentsData);
+        } catch (error: any) {
+            Alert.alert('Error', error.message || 'No se pudo cargar la solicitud.');
+            setTicket(null);
+            setComments([]);
+        } finally {
+            setLoading(false);
+        }
+    }, [id, isAdminContext, organizationId]);
+
+    useFocusEffect(
+        useCallback(() => {
+            void loadTicket();
+        }, [loadTicket]),
+    );
+
+    if (loading) {
+        return (
+            <SafeAreaView style={s.safe}>
+                <ActivityIndicator size="large" color="#1E3A5F" style={{ marginTop: 48 }} />
+            </SafeAreaView>
+        );
+    }
+
+    if (!ticket) {
+        return (
+            <SafeAreaView style={s.safe}>
+                <Text style={s.noData}>Solicitud no encontrada</Text>
+            </SafeAreaView>
+        );
+    }
 
     const handleChangeStatus = () => {
         Alert.alert('Cambiar estado', 'Selecciona el nuevo estado:', [
-            { text: 'En Proceso', onPress: () => updateSolicitudStatus(id, 'En proceso') },
-            { text: 'Resuelta', onPress: () => updateSolicitudStatus(id, 'Resuelta') },
-            { text: 'Rechazada', onPress: () => updateSolicitudStatus(id, 'Rechazada') },
+            { text: 'En proceso', onPress: () => void updateStatus('in_progress') },
+            { text: 'Resuelta', onPress: () => void updateStatus('resolved') },
+            { text: 'Rechazada', onPress: () => void updateStatus('rejected') },
             { text: 'Cancelar', style: 'cancel' },
         ]);
     };
 
-    const handleSendReply = () => {
-        if (!reply.trim()) return;
-        addSolicitudReply(id, reply, isAdmin ? 'admin' : 'user');
-        setReply('');
+    const updateStatus = async (status: 'in_progress' | 'resolved' | 'rejected') => {
+        try {
+            await ticketService.setTicketStatus(ticket.id, status);
+            await loadTicket();
+        } catch (error: any) {
+            Alert.alert('Error', error.message || 'No se pudo actualizar el estado.');
+        }
     };
+
+    const handleSendReply = async () => {
+        if (!reply.trim()) {
+            return;
+        }
+
+        setSending(true);
+        try {
+            await ticketService.addComment(ticket.id, reply);
+            setReply('');
+            await loadTicket();
+        } catch (error: any) {
+            Alert.alert('Error', error.message || 'No se pudo enviar el mensaje.');
+        } finally {
+            setSending(false);
+        }
+    };
+
+    const approveMapPin = async () => {
+        const titleMatch = ticket.description.match(/Nombre: (.*)/);
+        const descMatch = ticket.description.match(/Descripción: (.*)/);
+        const typeMatch = ticket.description.match(/Tipo: (.*)/);
+        const locMatch = ticket.description.match(/Ubicación: (.*), (.*)/);
+        const emojiMatch = ticket.description.match(/Emoji: (.*)/);
+
+        const title = titleMatch ? titleMatch[1] : ticket.title.replace('PIN: ', '').replace('📍 Pin: ', '');
+        const description = descMatch ? descMatch[1] : '';
+        const category = typeMatch && typeMatch[1].includes('Punto de Interés') ? 'punto_interes' : 'servicio';
+        const emoji = emojiMatch ? emojiMatch[1] : '📍';
+        let lat = -33.48942;
+        let lng = -70.6567;
+
+        if (locMatch && locMatch.length >= 3) {
+            lat = parseFloat(locMatch[1]);
+            lng = parseFloat(locMatch[2]);
+        }
+
+        try {
+            if (!organizationId) {
+                throw new Error('No se pudo identificar la organización.');
+            }
+
+            await poiService.createPoi({
+                organization_id: organizationId,
+                name: title,
+                description,
+                category,
+                latitude: lat,
+                longitude: lng,
+                emoji,
+                created_by: user?.id,
+            });
+
+            await ticketService.setTicketStatus(ticket.id, 'resolved');
+            await loadTicket();
+            Alert.alert('Pin aprobado', `El pin "${title}" fue agregado al mapa y la solicitud quedó resuelta.`);
+        } catch (error: any) {
+            Alert.alert('Error', error.message || 'No se pudo guardar el pin en el servidor.');
+        }
+    };
+
+    const addServicePin = async () => {
+        try {
+            if (!organizationId) {
+                throw new Error('No se pudo identificar la organización.');
+            }
+
+            const lat = -33.48942 + (Math.random() - 0.5) * 0.004;
+            const lng = -70.6567 + (Math.random() - 0.5) * 0.004;
+
+            await poiService.createPoi({
+                organization_id: organizationId,
+                name: ticket.title,
+                description: `${ticket.description.substring(0, 80)} - ${ticket.reporterName}`,
+                category: 'servicio',
+                latitude: lat,
+                longitude: lng,
+                emoji: '🔧',
+                created_by: user?.id,
+            });
+
+            Alert.alert('Pin agregado', `"${ticket.title}" fue agregado al mapa del barrio.`);
+        } catch (error: any) {
+            Alert.alert('Error', error.message || 'No se pudo guardar el pin en el servidor.');
+        }
+    };
+
+    const isClosed = ticket.rawStatus === 'resolved' || ticket.rawStatus === 'rejected';
 
     return (
         <SafeAreaView style={s.safe}>
             <ScrollView contentContainerStyle={s.scroll}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={s.back}><Text style={s.backText}>← Volver</Text></TouchableOpacity>
+                <TouchableOpacity onPress={() => navigation.goBack()} style={s.back}>
+                    <Text style={s.backText}>← Volver</Text>
+                </TouchableOpacity>
 
                 <View style={[s.header, { marginBottom: 4 }]}>
-                    <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#64748B' }}>#{solicitud.trackingNumber}</Text>
+                    <Text style={s.trackingCode}>#{ticket.trackingCode}</Text>
                 </View>
 
                 <View style={s.header}>
-                    <Text style={s.title}>{solicitud.title}</Text>
-                    <View style={[s.badge, { backgroundColor: getStatusColor(solicitud.status) }]}><Text style={s.badgeText}>{solicitud.status}</Text></View>
+                    <Text style={s.title}>{ticket.title}</Text>
+                    <View style={[s.badge, { backgroundColor: getStatusColor(ticket.status) }]}>
+                        <Text style={s.badgeText}>{ticket.status}</Text>
+                    </View>
                 </View>
 
                 <View style={s.infoRow}>
-                    <Text style={s.info}>👤 {solicitud.user}</Text>
-                    <Text style={s.info}>📅 {solicitud.date}</Text>
+                    <Text style={s.info}>👤 {ticket.reporterName}</Text>
+                    <Text style={s.info}>📅 {ticket.createdDateLabel}</Text>
                 </View>
 
                 <View style={s.descCard}>
                     <Text style={s.descLabel}>Descripción</Text>
-                    <Text style={s.descText}>{solicitud.description}</Text>
+                    <Text style={s.descText}>{ticket.description}</Text>
                 </View>
 
-                {solicitud.hasImage && solicitud.imageUri && (
+                {ticket.attachmentUrl && (
                     <View style={s.imageContainer}>
                         <Text style={s.descLabel}>📷 Imagen adjunta</Text>
-                        <Image source={{ uri: solicitud.imageUri }} style={s.image} resizeMode="cover" />
+                        <Image source={{ uri: ticket.attachmentUrl }} style={s.image} resizeMode="cover" />
                     </View>
                 )}
 
-                {isAdmin && (
+                {isAdminContext && (
                     <TouchableOpacity style={s.statusBtn} onPress={handleChangeStatus}>
                         <Text style={s.statusBtnText}>🔄 Cambiar Estado</Text>
                     </TouchableOpacity>
                 )}
 
-                {isAdmin && solicitud.title.startsWith('📍 Pin:') && solicitud.status !== 'Resuelta' && solicitud.status !== 'Rechazada' && (
-                    <TouchableOpacity style={s.pinBtn} onPress={async () => {
-                        const titleMatch = solicitud.description.match(/Nombre: (.*)/);
-                        const descMatch = solicitud.description.match(/Descripción: (.*)/);
-                        const typeMatch = solicitud.description.match(/Tipo: (.*)/);
-                        const locMatch = solicitud.description.match(/Ubicación: (.*), (.*)/);
-                        const emojiMatch = solicitud.description.match(/Emoji: (.*)/);
-
-                        const title = titleMatch ? titleMatch[1] : solicitud.title.replace('📍 Pin: ', '');
-                        const description = descMatch ? descMatch[1] : '';
-                        const category = typeMatch && typeMatch[1].includes('Punto de Interés') ? 'punto_interes' : 'servicio';
-                        const emoji = emojiMatch ? emojiMatch[1] : '📍';
-                        let lat = -33.48942, lng = -70.6567; // Default to San Ignacio/Florencia
-
-                        if (locMatch && locMatch.length >= 3) {
-                            lat = parseFloat(locMatch[1]);
-                            lng = parseFloat(locMatch[2]);
-                        }
-
-                        try {
-                            if (organizationId) {
-                                await poiService.createPoi({
-                                    organization_id: organizationId,
-                                    name: title,
-                                    description: description,
-                                    category: category,
-                                    latitude: lat,
-                                    longitude: lng,
-                                    emoji: emoji,
-                                    created_by: user?.id,
-                                });
-                                updateSolicitudStatus(solicitud.id, 'Resuelta');
-                                Alert.alert('✅ Pin Aprobado y Agregado', `El pin "${title}" ha sido agregado al mapa y la solicitud ha sido resuelta.`);
-                            } else {
-                                Alert.alert('Error', 'No se pudo identificar la organización.');
-                            }
-                        } catch (error) {
-                            console.error('Error approving pin:', error);
-                            Alert.alert('Error', 'No se pudo guardar el pin en el servidor.');
-                        }
-                    }}>
+                {isAdminContext && (ticket.title.startsWith('PIN:') || ticket.title.startsWith('📍 Pin:')) && !isClosed && (
+                    <TouchableOpacity style={s.pinBtn} onPress={() => void approveMapPin()}>
                         <Text style={s.pinBtnText}>✅ Aprobar Pin y Marcar Resuelta</Text>
                     </TouchableOpacity>
                 )}
 
-                {isAdmin && solicitud.category && ['Servicio', 'Oficio', 'Emprendimiento', 'Servicio/Oficio/Emprendimiento'].some(c => solicitud.category.includes(c)) && !solicitud.title.startsWith('📍 Pin:') && (
-                    <TouchableOpacity style={s.pinBtn} onPress={async () => {
-                        const lat = -33.48942 + (Math.random() - 0.5) * 0.004;
-                        const lng = -70.6567 + (Math.random() - 0.5) * 0.004;
-                        try {
-                            if (organizationId) {
-                                await poiService.createPoi({
-                                    organization_id: organizationId,
-                                    name: solicitud.title,
-                                    description: `${solicitud.description.substring(0, 80)} — ${solicitud.user}`,
-                                    category: 'servicio',
-                                    latitude: lat,
-                                    longitude: lng,
-                                    emoji: '🔧',
-                                    created_by: user?.id,
-                                });
-                                Alert.alert('✅ Pin agregado', `"${solicitud.title}" ha sido agregado al Mapa del Barrio.`);
-                            }
-                        } catch (error) {
-                            console.error('Error adding pin:', error);
-                            Alert.alert('Error', 'No se pudo guardar el pin en el servidor.');
-                        }
-                    }}>
+                {isAdminContext
+                    && ['Servicio', 'Oficio', 'Emprendimiento', 'Servicio/Oficio/Emprendimiento'].some((value) => ticket.category.includes(value))
+                    && !ticket.title.startsWith('PIN:') && !ticket.title.startsWith('📍 Pin:') && (
+                    <TouchableOpacity style={s.pinBtn} onPress={() => void addServicePin()}>
                         <Text style={s.pinBtnText}>📍 Agregar como Pin al Mapa</Text>
                     </TouchableOpacity>
                 )}
 
                 <Text style={s.sectionTitle}>💬 Conversación</Text>
-                {solicitud.replies.length === 0 ? (
+                {comments.length === 0 ? (
                     <Text style={s.noReplies}>No hay mensajes aún</Text>
-                ) : solicitud.replies.map(r => (
-                    <View key={r.id} style={[s.replyCard, r.from === 'admin' ? s.replyAdmin : s.replyUser]}>
-                        <Text style={s.replyFrom}>{r.from === 'admin' ? '👑 Administrador' : '👤 Vecino'}</Text>
-                        <Text style={s.replyMsg}>{r.message}</Text>
-                        <Text style={s.replyDate}>{r.date}</Text>
+                ) : comments.map((comment) => (
+                    <View key={comment.id} style={[s.replyCard, comment.from === 'admin' ? s.replyAdmin : s.replyUser]}>
+                        <Text style={s.replyFrom}>{comment.from === 'admin' ? '👑 Administración' : '👤 Vecino'}</Text>
+                        <Text style={s.replyMsg}>{comment.body}</Text>
+                        <Text style={s.replyDate}>{comment.createdDateLabel}</Text>
                     </View>
                 ))}
 
-                {(solicitud.status === 'Rechazada' || solicitud.status === 'Resuelta') ? (
+                {isClosed ? (
                     <View style={s.closedBox}>
-                        <Text style={s.closedText}>🔒 Esta solicitud está {solicitud.status.toLowerCase()} y no admite más mensajes.</Text>
+                        <Text style={s.closedText}>🔒 Esta solicitud está {ticket.status.toLowerCase()} y no admite más mensajes.</Text>
                     </View>
                 ) : (
                     <View style={s.replyBox}>
-                        <TextInput style={s.replyInput} placeholder="Escribe una respuesta..." placeholderTextColor="#94A3B8" value={reply} onChangeText={setReply} multiline />
-                        <TouchableOpacity style={s.sendBtn} onPress={handleSendReply}>
-                            <Text style={s.sendText}>➤</Text>
+                        <TextInput
+                            style={s.replyInput}
+                            placeholder="Escribe una respuesta..."
+                            placeholderTextColor="#94A3B8"
+                            value={reply}
+                            onChangeText={setReply}
+                            multiline
+                        />
+                        <TouchableOpacity style={s.sendBtn} onPress={() => void handleSendReply()} disabled={sending}>
+                            <Text style={s.sendText}>{sending ? '…' : '➤'}</Text>
                         </TouchableOpacity>
                     </View>
                 )}
@@ -174,18 +261,38 @@ export default function SolicitudDetailScreen({ route, navigation }: any) {
     );
 }
 
+const getStatusColor = (status: TicketItem['status']) => {
+    switch (status) {
+        case 'Abierta':
+            return '#EF4444';
+        case 'En proceso':
+            return '#F59E0B';
+        case 'Resuelta':
+            return '#22C55E';
+        case 'Rechazada':
+            return '#94A3B8';
+        default:
+            return '#94A3B8';
+    }
+};
+
 const s = StyleSheet.create({
-    safe: { flex: 1, backgroundColor: 'transparent' }, scroll: { padding: 20 },
-    back: { marginBottom: 16 }, backText: { color: '#2563EB', fontSize: 16, fontWeight: '600' },
+    safe: { flex: 1, backgroundColor: 'transparent' },
+    scroll: { padding: 20 },
+    back: { marginBottom: 16 },
+    backText: { color: '#2563EB', fontSize: 16, fontWeight: '600' },
     header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+    trackingCode: { fontSize: 13, fontWeight: 'bold', color: '#64748B' },
     title: { fontSize: 20, fontWeight: 'bold', color: '#1E3A5F', flex: 1, marginRight: 8 },
-    badge: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 }, badgeText: { color: '#FFFFFF', fontSize: 12, fontWeight: 'bold' },
-    infoRow: { flexDirection: 'row', gap: 16, marginBottom: 16 }, info: { fontSize: 13, color: '#64748B' },
+    badge: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
+    badgeText: { color: '#FFFFFF', fontSize: 12, fontWeight: 'bold' },
+    infoRow: { flexDirection: 'row', gap: 16, marginBottom: 16 },
+    info: { fontSize: 13, color: '#64748B' },
     descCard: { backgroundColor: '#FFFFFF', borderRadius: 14, padding: 16, marginBottom: 12, elevation: 1 },
     descLabel: { fontSize: 13, fontWeight: '600', color: '#64748B', marginBottom: 8 },
     descText: { fontSize: 15, color: '#0F172A', lineHeight: 22 },
     imageContainer: { backgroundColor: '#FFFFFF', borderRadius: 14, padding: 16, marginBottom: 12, elevation: 1 },
-    image: { width: '100%', height: 200, borderRadius: 10, marginTop: 4 },
+    image: { width: '100%', height: 220, borderRadius: 10, marginTop: 4 },
     statusBtn: { backgroundColor: '#F59E0B', borderRadius: 12, padding: 14, alignItems: 'center', marginBottom: 16 },
     statusBtnText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 16 },
     sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#1E3A5F', marginBottom: 12 },
@@ -197,12 +304,31 @@ const s = StyleSheet.create({
     replyMsg: { fontSize: 14, color: '#0F172A', lineHeight: 20 },
     replyDate: { fontSize: 11, color: '#94A3B8', marginTop: 4, textAlign: 'right' },
     replyBox: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, marginTop: 8, marginBottom: 40 },
-    replyInput: { flex: 1, backgroundColor: '#FFFFFF', borderRadius: 12, padding: 12, fontSize: 15, color: '#0F172A', borderWidth: 1, borderColor: '#E2E8F0', maxHeight: 100 },
+    replyInput: {
+        flex: 1,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 12,
+        padding: 12,
+        fontSize: 15,
+        color: '#0F172A',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        maxHeight: 100,
+    },
     sendBtn: { backgroundColor: '#2563EB', borderRadius: 12, width: 48, height: 48, justifyContent: 'center', alignItems: 'center' },
     sendText: { fontSize: 22, color: '#FFFFFF' },
     pinBtn: { backgroundColor: '#7C3AED', borderRadius: 12, padding: 14, alignItems: 'center', marginBottom: 12 },
     pinBtnText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 15 },
-    closedBox: { backgroundColor: '#F1F5F9', borderRadius: 12, padding: 16, marginTop: 8, marginBottom: 40, alignItems: 'center', borderWidth: 1, borderColor: '#E2E8F0' },
+    closedBox: {
+        backgroundColor: '#F1F5F9',
+        borderRadius: 12,
+        padding: 16,
+        marginTop: 8,
+        marginBottom: 40,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+    },
     closedText: { fontSize: 14, color: '#64748B', textAlign: 'center' },
     noData: { fontSize: 16, color: '#94A3B8', textAlign: 'center', marginTop: 40 },
 });

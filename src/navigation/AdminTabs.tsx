@@ -9,7 +9,8 @@ import AdminSolicitudesScreen from '../screens/admin/AdminSolicitudesScreen';
 import SolicitudDetailScreen from '../screens/shared/SolicitudDetailScreen';
 import AdminDocumentsScreen from '../screens/admin/AdminDocumentsScreen';
 import AdminMoreStack from './AdminMoreStack';
-import { useAppStore } from '../lib/store';
+import { useAuth } from '../context/AuthContext';
+import { useTicketCounters } from '../hooks/useTicketCounters';
 
 const Tab = createBottomTabNavigator();
 const SolStack = createNativeStackNavigator();
@@ -41,8 +42,8 @@ function SolicitudesStack() {
 
 export default function AdminTabs() {
     const insets = useSafeAreaInsets();
-    const solicitudes = useAppStore(s => s.solicitudes);
-    const unreadSol = solicitudes.filter(s => !s.seenByAdmin).length;
+    const { organizationId } = useAuth();
+    const { adminUnreadCount: unreadSol } = useTicketCounters(organizationId);
 
     return (
         <Tab.Navigator

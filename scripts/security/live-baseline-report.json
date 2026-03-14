@@ -1,0 +1,785 @@
+{
+  "generatedAt": "2026-03-14T02:36:45.344Z",
+  "target": "https://cuwikwegsopfxlubrvsp.supabase.co",
+  "tempUser": {
+    "email": "security.audit.1773455809733@example.com",
+    "userId": "e4a5297c-a298-4643-b73f-a46725850d9f"
+  },
+  "tests": [
+    {
+      "category": "anon-table-read",
+      "name": "organizations",
+      "severity": "high",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "body": [],
+        "rawBody": "[]"
+      },
+      "note": "Anonymous/anon-key caller should not enumerate JJVV business data."
+    },
+    {
+      "category": "anon-table-read",
+      "name": "memberships",
+      "severity": "high",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "body": [],
+        "rawBody": "[]"
+      },
+      "note": "Anonymous/anon-key caller should not enumerate JJVV business data."
+    },
+    {
+      "category": "anon-table-read",
+      "name": "announcements",
+      "severity": "high",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "body": [],
+        "rawBody": "[]"
+      },
+      "note": "Anonymous/anon-key caller should not enumerate JJVV business data."
+    },
+    {
+      "category": "anon-table-read",
+      "name": "alerts",
+      "severity": "high",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "body": [],
+        "rawBody": "[]"
+      },
+      "note": "Anonymous/anon-key caller should not enumerate JJVV business data."
+    },
+    {
+      "category": "anon-table-read",
+      "name": "events",
+      "severity": "high",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "body": [],
+        "rawBody": "[]"
+      },
+      "note": "Anonymous/anon-key caller should not enumerate JJVV business data."
+    },
+    {
+      "category": "anon-table-read",
+      "name": "tickets",
+      "severity": "high",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "body": [],
+        "rawBody": "[]"
+      },
+      "note": "Anonymous/anon-key caller should not enumerate JJVV business data."
+    },
+    {
+      "category": "anon-table-read",
+      "name": "dues_ledger",
+      "severity": "high",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "body": [],
+        "rawBody": "[]"
+      },
+      "note": "Anonymous/anon-key caller should not enumerate JJVV business data."
+    },
+    {
+      "category": "anon-table-read",
+      "name": "documents",
+      "severity": "high",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "body": [],
+        "rawBody": "[]"
+      },
+      "note": "Anonymous/anon-key caller should not enumerate JJVV business data."
+    },
+    {
+      "category": "anon-table-read",
+      "name": "finance_entries",
+      "severity": "high",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "body": [],
+        "rawBody": "[]"
+      },
+      "note": "Anonymous/anon-key caller should not enumerate JJVV business data."
+    },
+    {
+      "category": "anon-table-read",
+      "name": "notifications",
+      "severity": "high",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "body": [],
+        "rawBody": "[]"
+      },
+      "note": "Anonymous/anon-key caller should not enumerate JJVV business data."
+    },
+    {
+      "category": "anon-table-read",
+      "name": "audit_log",
+      "severity": "high",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "body": [],
+        "rawBody": "[]"
+      },
+      "note": "Anonymous/anon-key caller should not enumerate JJVV business data."
+    },
+    {
+      "category": "anon-helper-rpc",
+      "name": "superadmin_email",
+      "severity": "high",
+      "passed": true,
+      "evidence": {
+        "status": 401,
+        "body": {
+          "code": "42501",
+          "details": null,
+          "hint": null,
+          "message": "permission denied for function superadmin_email"
+        },
+        "rawBody": "{\"code\":\"42501\",\"details\":null,\"hint\":null,\"message\":\"permission denied for function superadmin_email\"}"
+      },
+      "note": "Internal helper RPCs should not be callable by public clients."
+    },
+    {
+      "category": "anon-helper-rpc",
+      "name": "global_superadmin_user_id",
+      "severity": "high",
+      "passed": true,
+      "evidence": {
+        "status": 401,
+        "body": {
+          "code": "42501",
+          "details": null,
+          "hint": null,
+          "message": "permission denied for function global_superadmin_user_id"
+        },
+        "rawBody": "{\"code\":\"42501\",\"details\":null,\"hint\":null,\"message\":\"permission denied for function global_superadmin_user_id\"}"
+      },
+      "note": "Internal helper RPCs should not be callable by public clients."
+    },
+    {
+      "category": "anon-helper-rpc",
+      "name": "is_global_superadmin",
+      "severity": "high",
+      "passed": true,
+      "evidence": {
+        "status": 401,
+        "body": {
+          "code": "42501",
+          "details": null,
+          "hint": null,
+          "message": "permission denied for function is_global_superadmin"
+        },
+        "rawBody": "{\"code\":\"42501\",\"details\":null,\"hint\":null,\"message\":\"permission denied for function is_global_superadmin\"}"
+      },
+      "note": "Internal helper RPCs should not be callable by public clients."
+    },
+    {
+      "category": "anon-helper-rpc",
+      "name": "is_member_of",
+      "severity": "high",
+      "passed": true,
+      "evidence": {
+        "status": 401,
+        "body": {
+          "code": "42501",
+          "details": null,
+          "hint": null,
+          "message": "permission denied for function is_member_of"
+        },
+        "rawBody": "{\"code\":\"42501\",\"details\":null,\"hint\":null,\"message\":\"permission denied for function is_member_of\"}"
+      },
+      "note": "Internal helper RPCs should not be callable by public clients."
+    },
+    {
+      "category": "anon-helper-rpc",
+      "name": "has_role",
+      "severity": "high",
+      "passed": true,
+      "evidence": {
+        "status": 401,
+        "body": {
+          "code": "42501",
+          "details": null,
+          "hint": null,
+          "message": "permission denied for function has_role"
+        },
+        "rawBody": "{\"code\":\"42501\",\"details\":null,\"hint\":null,\"message\":\"permission denied for function has_role\"}"
+      },
+      "note": "Internal helper RPCs should not be callable by public clients."
+    },
+    {
+      "category": "anon-helper-rpc",
+      "name": "storage_object_org_id",
+      "severity": "high",
+      "passed": true,
+      "evidence": {
+        "status": 401,
+        "body": {
+          "code": "42501",
+          "details": null,
+          "hint": null,
+          "message": "permission denied for function storage_object_org_id"
+        },
+        "rawBody": "{\"code\":\"42501\",\"details\":null,\"hint\":null,\"message\":\"permission denied for function storage_object_org_id\"}"
+      },
+      "note": "Internal helper RPCs should not be callable by public clients."
+    },
+    {
+      "category": "anon-helper-rpc",
+      "name": "storage_object_user_id",
+      "severity": "high",
+      "passed": true,
+      "evidence": {
+        "status": 401,
+        "body": {
+          "code": "42501",
+          "details": null,
+          "hint": null,
+          "message": "permission denied for function storage_object_user_id"
+        },
+        "rawBody": "{\"code\":\"42501\",\"details\":null,\"hint\":null,\"message\":\"permission denied for function storage_object_user_id\"}"
+      },
+      "note": "Internal helper RPCs should not be callable by public clients."
+    },
+    {
+      "category": "anon-helper-rpc",
+      "name": "sync_global_superadmin_memberships",
+      "severity": "high",
+      "passed": true,
+      "evidence": {
+        "status": 401,
+        "body": {
+          "code": "42501",
+          "details": null,
+          "hint": null,
+          "message": "permission denied for function sync_global_superadmin_memberships"
+        },
+        "rawBody": "{\"code\":\"42501\",\"details\":null,\"hint\":null,\"message\":\"permission denied for function sync_global_superadmin_memberships\"}"
+      },
+      "note": "Internal helper RPCs should not be callable by public clients."
+    },
+    {
+      "category": "anon-storage",
+      "name": "list-private-bucket",
+      "severity": "high",
+      "passed": true,
+      "evidence": {
+        "status": 400,
+        "body": {
+          "statusCode": "400",
+          "error": "Error",
+          "message": "headers must have required property 'authorization'"
+        },
+        "rawBody": "{\"statusCode\":\"400\",\"error\":\"Error\",\"message\":\"headers must have required property 'authorization'\"}"
+      },
+      "note": "Anonymous callers must not list private JJVV buckets."
+    },
+    {
+      "category": "anon-storage",
+      "name": "public-private-bucket-url",
+      "severity": "high",
+      "passed": true,
+      "evidence": {
+        "status": 400,
+        "body": {
+          "statusCode": "404",
+          "error": "Bucket not found",
+          "message": "Bucket not found"
+        },
+        "rawBody": "{\"statusCode\":\"404\",\"error\":\"Bucket not found\",\"message\":\"Bucket not found\"}"
+      },
+      "note": "Private JJVV buckets must not resolve through public URLs."
+    },
+    {
+      "category": "anon-edge-function",
+      "name": "send_push",
+      "severity": "medium",
+      "passed": true,
+      "evidence": {
+        "status": 404,
+        "body": {
+          "code": "NOT_FOUND",
+          "message": "Requested function was not found"
+        },
+        "rawBody": "{\"code\":\"NOT_FOUND\",\"message\":\"Requested function was not found\"}"
+      },
+      "note": "Anonymous callers must not invoke privileged push flows. A 404 usually means the function is not deployed in this environment."
+    },
+    {
+      "category": "auth-no-membership-rpc",
+      "name": "list_accessible_organizations",
+      "severity": "high",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "body": [],
+        "rawBody": "[]"
+      },
+      "note": "Authenticated users without membership should not receive JJVV context. A 404 indicates a deployment/schema-cache mismatch for this RPC in the live project."
+    },
+    {
+      "category": "auth-no-membership-table-read",
+      "name": "profiles-own-only",
+      "severity": "medium",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "body": [],
+        "rawBody": "[]"
+      },
+      "note": "A no-membership user should see only their own profile row."
+    },
+    {
+      "category": "auth-no-membership-table-read",
+      "name": "organizations",
+      "severity": "high",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "body": [],
+        "rawBody": "[]"
+      },
+      "note": "Authenticated users without membership should not read community data."
+    },
+    {
+      "category": "auth-no-membership-table-read",
+      "name": "memberships",
+      "severity": "high",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "body": [],
+        "rawBody": "[]"
+      },
+      "note": "Authenticated users without membership should not read community data."
+    },
+    {
+      "category": "auth-no-membership-table-read",
+      "name": "announcements",
+      "severity": "high",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "body": [],
+        "rawBody": "[]"
+      },
+      "note": "Authenticated users without membership should not read community data."
+    },
+    {
+      "category": "auth-no-membership-table-read",
+      "name": "alerts",
+      "severity": "high",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "body": [],
+        "rawBody": "[]"
+      },
+      "note": "Authenticated users without membership should not read community data."
+    },
+    {
+      "category": "auth-no-membership-table-read",
+      "name": "events",
+      "severity": "high",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "body": [],
+        "rawBody": "[]"
+      },
+      "note": "Authenticated users without membership should not read community data."
+    },
+    {
+      "category": "auth-no-membership-table-read",
+      "name": "tickets",
+      "severity": "high",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "body": [],
+        "rawBody": "[]"
+      },
+      "note": "Authenticated users without membership should not read community data."
+    },
+    {
+      "category": "auth-no-membership-table-read",
+      "name": "dues_ledger",
+      "severity": "high",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "body": [],
+        "rawBody": "[]"
+      },
+      "note": "Authenticated users without membership should not read community data."
+    },
+    {
+      "category": "auth-no-membership-table-read",
+      "name": "documents",
+      "severity": "high",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "body": [],
+        "rawBody": "[]"
+      },
+      "note": "Authenticated users without membership should not read community data."
+    },
+    {
+      "category": "auth-no-membership-table-read",
+      "name": "finance_entries",
+      "severity": "high",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "body": [],
+        "rawBody": "[]"
+      },
+      "note": "Authenticated users without membership should not read community data."
+    },
+    {
+      "category": "auth-no-membership-table-read",
+      "name": "notifications",
+      "severity": "high",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "body": [],
+        "rawBody": "[]"
+      },
+      "note": "Authenticated users without membership should not read community data."
+    },
+    {
+      "category": "auth-no-membership-table-read",
+      "name": "audit_log",
+      "severity": "high",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "body": [],
+        "rawBody": "[]"
+      },
+      "note": "Authenticated users without membership should not read community data."
+    },
+    {
+      "category": "auth-no-membership-direct-write",
+      "name": "alerts",
+      "severity": "high",
+      "passed": true,
+      "evidence": {
+        "status": 403,
+        "body": {
+          "code": "42501",
+          "details": null,
+          "hint": null,
+          "message": "new row violates row-level security policy for table \"alerts\""
+        },
+        "rawBody": "{\"code\":\"42501\",\"details\":null,\"hint\":null,\"message\":\"new row violates row-level security policy for table \\\"alerts\\\"\"}"
+      },
+      "note": "Direct writes without active JJVV membership should be blocked by RLS."
+    },
+    {
+      "category": "auth-no-membership-direct-write",
+      "name": "finance_entries",
+      "severity": "high",
+      "passed": true,
+      "evidence": {
+        "status": 403,
+        "body": {
+          "code": "42501",
+          "details": null,
+          "hint": null,
+          "message": "new row violates row-level security policy for table \"finance_entries\""
+        },
+        "rawBody": "{\"code\":\"42501\",\"details\":null,\"hint\":null,\"message\":\"new row violates row-level security policy for table \\\"finance_entries\\\"\"}"
+      },
+      "note": "Direct writes without active JJVV membership should be blocked by RLS."
+    },
+    {
+      "category": "auth-no-membership-direct-write",
+      "name": "documents",
+      "severity": "high",
+      "passed": true,
+      "evidence": {
+        "status": 403,
+        "body": {
+          "code": "42501",
+          "details": null,
+          "hint": null,
+          "message": "new row violates row-level security policy for table \"documents\""
+        },
+        "rawBody": "{\"code\":\"42501\",\"details\":null,\"hint\":null,\"message\":\"new row violates row-level security policy for table \\\"documents\\\"\"}"
+      },
+      "note": "Direct writes without active JJVV membership should be blocked by RLS."
+    },
+    {
+      "category": "auth-no-membership-direct-write",
+      "name": "favors",
+      "severity": "high",
+      "passed": true,
+      "evidence": {
+        "status": 403,
+        "body": {
+          "code": "42501",
+          "details": null,
+          "hint": null,
+          "message": "new row violates row-level security policy for table \"favors\""
+        },
+        "rawBody": "{\"code\":\"42501\",\"details\":null,\"hint\":null,\"message\":\"new row violates row-level security policy for table \\\"favors\\\"\"}"
+      },
+      "note": "Direct writes without active JJVV membership should be blocked by RLS."
+    },
+    {
+      "category": "auth-no-membership-direct-write",
+      "name": "notifications",
+      "severity": "high",
+      "passed": true,
+      "evidence": {
+        "status": 403,
+        "body": {
+          "code": "42501",
+          "details": null,
+          "hint": null,
+          "message": "new row violates row-level security policy for table \"notifications\""
+        },
+        "rawBody": "{\"code\":\"42501\",\"details\":null,\"hint\":null,\"message\":\"new row violates row-level security policy for table \\\"notifications\\\"\"}"
+      },
+      "note": "Direct writes without active JJVV membership should be blocked by RLS."
+    },
+    {
+      "category": "auth-no-membership-direct-write",
+      "name": "push_tokens",
+      "severity": "critical",
+      "passed": true,
+      "evidence": {
+        "status": 403,
+        "body": {
+          "code": "42501",
+          "details": null,
+          "hint": null,
+          "message": "new row violates row-level security policy for table \"push_tokens\""
+        },
+        "rawBody": "{\"code\":\"42501\",\"details\":null,\"hint\":null,\"message\":\"new row violates row-level security policy for table \\\"push_tokens\\\"\"}"
+      },
+      "note": "A push token write must fail at RLS, not at the foreign-key layer."
+    },
+    {
+      "category": "auth-no-membership-rpc",
+      "name": "list_organization_members",
+      "severity": "high",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "body": [],
+        "rawBody": "[]"
+      },
+      "note": "Client-callable RPCs must enforce membership and role checks server-side."
+    },
+    {
+      "category": "auth-no-membership-rpc",
+      "name": "update_membership_role",
+      "severity": "high",
+      "passed": true,
+      "evidence": {
+        "status": 400,
+        "body": {
+          "code": "P0001",
+          "details": null,
+          "hint": null,
+          "message": "Insufficient privileges"
+        },
+        "rawBody": "{\"code\":\"P0001\",\"details\":null,\"hint\":null,\"message\":\"Insufficient privileges\"}"
+      },
+      "note": "Client-callable RPCs must enforce membership and role checks server-side."
+    },
+    {
+      "category": "auth-no-membership-rpc",
+      "name": "set_membership_active",
+      "severity": "high",
+      "passed": true,
+      "evidence": {
+        "status": 400,
+        "body": {
+          "code": "P0001",
+          "details": null,
+          "hint": null,
+          "message": "Insufficient privileges"
+        },
+        "rawBody": "{\"code\":\"P0001\",\"details\":null,\"hint\":null,\"message\":\"Insufficient privileges\"}"
+      },
+      "note": "Client-callable RPCs must enforce membership and role checks server-side."
+    },
+    {
+      "category": "auth-no-membership-rpc",
+      "name": "list_organization_dues",
+      "severity": "high",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "body": [],
+        "rawBody": "[]"
+      },
+      "note": "Client-callable RPCs must enforce membership and role checks server-side."
+    },
+    {
+      "category": "auth-no-membership-rpc",
+      "name": "create_ticket",
+      "severity": "high",
+      "passed": true,
+      "evidence": {
+        "status": 400,
+        "body": {
+          "code": "P0001",
+          "details": null,
+          "hint": null,
+          "message": "Membership required"
+        },
+        "rawBody": "{\"code\":\"P0001\",\"details\":null,\"hint\":null,\"message\":\"Membership required\"}"
+      },
+      "note": "Client-callable RPCs must enforce membership and role checks server-side."
+    },
+    {
+      "category": "auth-no-membership-oracle",
+      "name": "approve_due_payment",
+      "severity": "medium",
+      "passed": true,
+      "evidence": {
+        "status": 400,
+        "body": {
+          "code": "P0001",
+          "details": null,
+          "hint": null,
+          "message": "Due ledger entry not found or access denied"
+        },
+        "rawBody": "{\"code\":\"P0001\",\"details\":null,\"hint\":null,\"message\":\"Due ledger entry not found or access denied\"}"
+      },
+      "note": "Privileged RPCs should return a generic access-denied/not-found response to avoid resource existence oracles."
+    },
+    {
+      "category": "auth-no-membership-oracle",
+      "name": "set_due_status_admin",
+      "severity": "medium",
+      "passed": true,
+      "evidence": {
+        "status": 400,
+        "body": {
+          "code": "P0001",
+          "details": null,
+          "hint": null,
+          "message": "Due ledger entry not found or access denied"
+        },
+        "rawBody": "{\"code\":\"P0001\",\"details\":null,\"hint\":null,\"message\":\"Due ledger entry not found or access denied\"}"
+      },
+      "note": "Privileged RPCs should return a generic access-denied/not-found response to avoid resource existence oracles."
+    },
+    {
+      "category": "auth-no-membership-oracle",
+      "name": "mark_ticket_seen",
+      "severity": "medium",
+      "passed": true,
+      "evidence": {
+        "status": 400,
+        "body": {
+          "code": "P0001",
+          "details": null,
+          "hint": null,
+          "message": "Ticket not found or access denied"
+        },
+        "rawBody": "{\"code\":\"P0001\",\"details\":null,\"hint\":null,\"message\":\"Ticket not found or access denied\"}"
+      },
+      "note": "Privileged RPCs should return a generic access-denied/not-found response to avoid resource existence oracles."
+    },
+    {
+      "category": "auth-no-membership-oracle",
+      "name": "set_ticket_status",
+      "severity": "medium",
+      "passed": true,
+      "evidence": {
+        "status": 400,
+        "body": {
+          "code": "P0001",
+          "details": null,
+          "hint": null,
+          "message": "Ticket not found or access denied"
+        },
+        "rawBody": "{\"code\":\"P0001\",\"details\":null,\"hint\":null,\"message\":\"Ticket not found or access denied\"}"
+      },
+      "note": "Privileged RPCs should return a generic access-denied/not-found response to avoid resource existence oracles."
+    },
+    {
+      "category": "auth-no-membership-storage",
+      "name": "upload-private-doc",
+      "severity": "high",
+      "passed": true,
+      "evidence": {
+        "status": 400,
+        "body": {
+          "statusCode": "403",
+          "error": "Unauthorized",
+          "message": "new row violates row-level security policy"
+        },
+        "rawBody": "{\"statusCode\":\"403\",\"error\":\"Unauthorized\",\"message\":\"new row violates row-level security policy\"}"
+      },
+      "note": "Private JJVV storage must not be writable/readable by outsiders."
+    },
+    {
+      "category": "auth-no-membership-storage",
+      "name": "upload-dues-proof-without-membership",
+      "severity": "high",
+      "passed": true,
+      "evidence": {
+        "status": 400,
+        "body": {
+          "statusCode": "403",
+          "error": "Unauthorized",
+          "message": "new row violates row-level security policy"
+        },
+        "rawBody": "{\"statusCode\":\"403\",\"error\":\"Unauthorized\",\"message\":\"new row violates row-level security policy\"}"
+      },
+      "note": "Private JJVV storage must not be writable/readable by outsiders."
+    },
+    {
+      "category": "auth-no-membership-storage",
+      "name": "list-ticket-attachments-without-membership",
+      "severity": "high",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "body": [],
+        "rawBody": "[]"
+      },
+      "note": "Private JJVV storage must not be writable/readable by outsiders."
+    },
+    {
+      "category": "auth-no-membership-edge-function",
+      "name": "send_push",
+      "severity": "medium",
+      "passed": true,
+      "evidence": {
+        "status": 404,
+        "body": {
+          "code": "NOT_FOUND",
+          "message": "Requested function was not found"
+        },
+        "rawBody": "{\"code\":\"NOT_FOUND\",\"message\":\"Requested function was not found\"}"
+      },
+      "note": "A no-membership authenticated user must not invoke privileged notification broadcasts. A 404 indicates the function is not deployed in this environment."
+    }
+  ]
+}

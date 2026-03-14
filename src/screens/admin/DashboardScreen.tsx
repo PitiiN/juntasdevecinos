@@ -4,13 +4,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useAppStore } from '../../lib/store';
 import { useAuth } from '../../context/AuthContext';
+import { useTicketCounters } from '../../hooks/useTicketCounters';
 
 export default function DashboardScreen() {
     const navigation = useNavigation<any>();
-    const { organizationLogoUrl, organizationName } = useAuth();
-    const { announcements, solicitudes, documents, members } = useAppStore();
-
-    const openSolicitudes = solicitudes.filter(s => s.status === 'Abierta').length;
+    const { organizationId, organizationLogoUrl, organizationName } = useAuth();
+    const { announcements, documents, members } = useAppStore();
+    const { openCount: openSolicitudes } = useTicketCounters(organizationId);
 
     const stats = [
         { label: 'Socios', value: members.length.toString(), icon: '👥', color: '#FFF7ED', tab: 'Admin', screen: 'ManageMembers' },
@@ -40,7 +40,7 @@ export default function DashboardScreen() {
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                         <View style={{ flex: 1 }}>
                             <Text style={s.headerTitle}>Panel de Administración</Text>
-                            <Text style={s.headerSub}>{organizationName || 'Junta de Vecinos UV 22 • San Miguel'}</Text>
+                            <Text style={s.headerSub}>{organizationName || 'Junta de Vecinos'}</Text>
                         </View>
                         {organizationLogoUrl && (
                             <Image source={{ uri: organizationLogoUrl }} style={s.logo} resizeMode="contain" />

@@ -9,6 +9,7 @@ import EventsScreen from '../screens/user/EventsScreen';
 import MoreStack from './MoreStack';
 import { useAppStore } from '../lib/store';
 import { useAuth } from '../context/AuthContext';
+import { useTicketCounters } from '../hooks/useTicketCounters';
 
 const Tab = createBottomTabNavigator();
 
@@ -30,15 +31,13 @@ const b = StyleSheet.create({
 
 export default function UserTabs() {
     const insets = useSafeAreaInsets();
-    const { user } = useAuth();
-    const solicitudes = useAppStore(s => s.solicitudes);
+    const { organizationId } = useAuth();
     const announcements = useAppStore(s => s.announcements);
     const documents = useAppStore(s => s.documents);
     const seenAvisosCount = useAppStore(s => s.seenAvisosCount);
     const seenDocsCount = useAppStore(s => s.seenDocsCount);
+    const { myUnreadCount: unreadSolicitudes } = useTicketCounters(organizationId);
 
-    const mySolicitudes = solicitudes.filter(s => s.userEmail === user?.email || s.user === user?.user_metadata?.full_name);
-    const unreadSolicitudes = mySolicitudes.filter(s => !s.seenByUser).length;
     const unreadAvisos = Math.max(0, announcements.length - seenAvisosCount);
     const unreadDocs = Math.max(0, documents.length - seenDocsCount);
     const unreadMore = unreadSolicitudes + unreadDocs;

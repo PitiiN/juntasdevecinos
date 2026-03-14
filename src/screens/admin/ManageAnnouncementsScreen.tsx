@@ -1,17 +1,77 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, Switch, Platform, Modal } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+    ActivityIndicator,
+    Alert,
+    Modal,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Switch,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useAppStore } from '../../lib/store';
+import { useAuth } from '../../context/AuthContext';
+import { announcementService, CommunityAnnouncement } from '../../services/announcementService';
+import { CommunityPoll, pollService } from '../../services/pollService';
 import { pushService } from '../../services/pushService';
 
-const MONTHS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 const MONTHS_SHORT = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-const YEARS: number[] = [];
-for (let y = 2020; y <= 2040; y++) YEARS.push(y);
+const YEARS = Array.from({ length: 21 }, (_, index) => 2020 + index);
+
+const toStoreAnnouncements = (announcements: CommunityAnnouncement[]) =>
+    announcements.map((announcement) => ({
+        id: announcement.id,
+        title: announcement.title,
+        body: announcement.body,
+        priority: announcement.priority,
+        date: new Date(announcement.published_at).toLocaleDateString('es-CL'),
+        schedule: announcement.schedule || undefined,
+        location: announcement.location || undefined,
+        expiresAt: announcement.expires_at || null,
+        replies: (announcement.announcement_replies || []).map((reply) => ({
+            id: reply.id,
+            message: reply.body,
+            userName: reply.author_name,
+            date: new Date(reply.created_at).toLocaleDateString('es-CL'),
+            from: 'user' as const,
+            mediaUrl: reply.media_url || undefined,
+            mediaType: reply.media_type || undefined,
+        })),
+    }));
+
+const isAnnouncementExpired = (announcement: CommunityAnnouncement) => {
+    const publishedAt = new Date(announcement.published_at);
+    const oneMonthAgo = new Date();
+    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+
+    if (publishedAt < oneMonthAgo) {
+        return true;
+    }
+
+    if (!announcement.expires_at) {
+        return false;
+    }
+
+    return new Date() > new Date(announcement.expires_at);
+};
+
+const matchesMonthAndYear = (value: string, month: number, year: number) => {
+    const date = new Date(value);
+    return date.getMonth() === month && date.getFullYear() === year;
+};
 
 export default function ManageAnnouncementsScreen() {
-    const { announcements, addAnnouncement, removeAnnouncement, updateAnnouncement, polls, addPoll, removePoll } = useAppStore();
+    const { organizationId, user } = useAuth();
+    const setAnnouncements = useAppStore((state) => state.setAnnouncements);
+    const [announcements, setRemoteAnnouncements] = useState<CommunityAnnouncement[]>([]);
+    const [polls, setPolls] = useState<CommunityPoll[]>([]);
+    const [loadingAnnouncements, setLoadingAnnouncements] = useState(false);
+    const [loadingPolls, setLoadingPolls] = useState(false);
     const [showForm, setShowForm] = useState(false);
     const [formType, setFormType] = useState<'aviso' | 'encuesta'>('aviso');
     const [editId, setEditId] = useState<string | null>(null);
@@ -20,202 +80,411 @@ export default function ManageAnnouncementsScreen() {
     const [location, setLocation] = useState('');
     const [schedule, setSchedule] = useState('');
     const [priority, setPriority] = useState<'normal' | 'important'>('normal');
-
-    // Expiry field
     const [expiresAtDate, setExpiresAtDate] = useState<Date | null>(null);
-    const [noExpiry, setNoExpiry] = useState(true); // "No aplica" by default
+    const [noExpiry, setNoExpiry] = useState(true);
     const [showExpiryPicker, setShowExpiryPicker] = useState(false);
-
-    // Poll fields
     const [pollQuestion, setPollQuestion] = useState('');
     const [pollOptions, setPollOptions] = useState<string[]>(['', '']);
     const [pollDeadline, setPollDeadline] = useState('');
     const [allowMultiple, setAllowMultiple] = useState(false);
     const [showDatePicker, setShowDatePicker] = useState(false);
-
     const [sendPush, setSendPush] = useState(false);
-
-    // Month/Year filter
+    const [showHistoricAvisos, setShowHistoricAvisos] = useState(false);
+    const [showHistoricPolls, setShowHistoricPolls] = useState(false);
+    const [showYearPicker, setShowYearPicker] = useState(false);
+    const yearScrollRef = useRef<ScrollView>(null);
     const now = new Date();
     const [filterMonth, setFilterMonth] = useState(now.getMonth());
     const [filterYear, setFilterYear] = useState(now.getFullYear());
-    const [showYearPicker, setShowYearPicker] = useState(false);
-    const yearScrollRef = React.useRef<ScrollView>(null);
 
-    // Historical toggle
-    const [showHistoricAvisos, setShowHistoricAvisos] = useState(false);
-    const [showHistoricPolls, setShowHistoricPolls] = useState(false);
+    const loadAnnouncements = useCallback(async () => {
+        if (!organizationId) {
+            setRemoteAnnouncements([]);
+            setAnnouncements([]);
+            return;
+        }
 
-    const isExpiredAviso = (a: any) => {
-        const publishedAt = a.date ? new Date(a.date) : new Date();
-        const oneMonthAgo = new Date();
-        oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+        setLoadingAnnouncements(true);
+        try {
+            const data = await announcementService.getAnnouncements(organizationId);
+            setRemoteAnnouncements(data);
+            setAnnouncements(toStoreAnnouncements(data));
+        } catch (error: any) {
+            Alert.alert('Error', error.message || 'No se pudieron cargar los avisos.');
+        } finally {
+            setLoadingAnnouncements(false);
+        }
+    }, [organizationId, setAnnouncements]);
 
-        // 1-month rule: if older than 30 days
-        if (publishedAt < oneMonthAgo) return true;
+    const loadPolls = useCallback(async () => {
+        if (!organizationId) {
+            setPolls([]);
+            return;
+        }
 
-        if (!a.expiresAt) return false;
-        return new Date() > new Date(a.expiresAt);
+        setLoadingPolls(true);
+        try {
+            const data = await pollService.getPolls(organizationId);
+            setPolls(data);
+        } catch (error: any) {
+            Alert.alert('Error', error.message || 'No se pudieron cargar las encuestas.');
+        } finally {
+            setLoadingPolls(false);
+        }
+    }, [organizationId]);
+
+    useEffect(() => {
+        void loadAnnouncements();
+        void loadPolls();
+    }, [loadAnnouncements, loadPolls]);
+
+    const resetForm = () => {
+        setShowForm(false);
+        setEditId(null);
+        setFormType('aviso');
+        setTitle('');
+        setBody('');
+        setLocation('');
+        setSchedule('');
+        setPriority('normal');
+        setExpiresAtDate(null);
+        setNoExpiry(true);
+        setShowExpiryPicker(false);
+        setPollQuestion('');
+        setPollOptions(['', '']);
+        setPollDeadline('');
+        setAllowMultiple(false);
+        setShowDatePicker(false);
+        setSendPush(false);
     };
-    const isExpiredPoll = (p: any) => new Date() > new Date(p.deadline);
 
-    const activeAvisos = announcements.filter(a => !isExpiredAviso(a));
-    const historicAvisos = announcements.filter(a => isExpiredAviso(a));
-    const activePolls = polls.filter(p => !isExpiredPoll(p));
-    const historicPolls = polls.filter(p => isExpiredPoll(p));
-
-    const startEdit = (a: any) => {
-        setEditId(a.id); setTitle(a.title); setBody(a.body); setPriority(a.priority);
-        setLocation(a.location || ''); setSchedule(a.schedule || '');
-        if (a.expiresAt) { setNoExpiry(false); setExpiresAtDate(new Date(a.expiresAt)); } else { setNoExpiry(true); setExpiresAtDate(null); }
-        setSendPush(false); setShowForm(true); setFormType('aviso');
+    const startEdit = (announcement: CommunityAnnouncement) => {
+        setEditId(announcement.id);
+        setShowForm(true);
+        setFormType('aviso');
+        setTitle(announcement.title);
+        setBody(announcement.body);
+        setLocation(announcement.location || '');
+        setSchedule(announcement.schedule || '');
+        setPriority(announcement.priority);
+        setSendPush(false);
+        if (announcement.expires_at) {
+            setNoExpiry(false);
+            setExpiresAtDate(new Date(announcement.expires_at));
+        } else {
+            setNoExpiry(true);
+            setExpiresAtDate(null);
+        }
     };
+
+    const filteredAnnouncements = useMemo(
+        () => announcements.filter((announcement) => matchesMonthAndYear(announcement.published_at, filterMonth, filterYear)),
+        [announcements, filterMonth, filterYear]
+    );
+
+    const filteredPolls = useMemo(
+        () => polls.filter((poll) => matchesMonthAndYear(poll.createdAt, filterMonth, filterYear)),
+        [polls, filterMonth, filterYear]
+    );
+
+    const activeAnnouncements = useMemo(
+        () => filteredAnnouncements.filter((announcement) => !isAnnouncementExpired(announcement)),
+        [filteredAnnouncements]
+    );
+
+    const historicAnnouncements = useMemo(
+        () => filteredAnnouncements.filter((announcement) => isAnnouncementExpired(announcement)),
+        [filteredAnnouncements]
+    );
+
+    const activePolls = useMemo(
+        () => filteredPolls.filter((poll) => new Date() <= new Date(poll.deadline)),
+        [filteredPolls]
+    );
+
+    const historicPolls = useMemo(
+        () => filteredPolls.filter((poll) => new Date() > new Date(poll.deadline)),
+        [filteredPolls]
+    );
 
     const handleSave = async () => {
         if (formType === 'aviso') {
-            if (!title.trim() || !body.trim()) { Alert.alert('Error', 'Completa título y contenido.'); return; }
-            const expiresAt = noExpiry ? null : (expiresAtDate ? expiresAtDate.toISOString() : null);
-            if (editId) {
-                updateAnnouncement(editId, { title, body, priority, location, schedule, expiresAt });
-                Alert.alert('✅ Aviso actualizado');
-            } else {
-                addAnnouncement({ title, body, priority, location, schedule, expiresAt });
-                if (sendPush) await pushService.broadcastPushNotification(`📣 ${title}`, body, { type: 'announcement' });
-                Alert.alert('✅ Aviso publicado', sendPush ? 'Se ha enviado Notificación Push.' : '');
+            if (!organizationId || !user) {
+                Alert.alert('Error', 'No se pudo resolver tu organizacion o usuario.');
+                return;
             }
-        } else {
-            const validOptions = pollOptions.filter(o => o.trim() !== '');
-            if (!pollQuestion.trim() || validOptions.length < 2 || !pollDeadline.trim()) {
-                Alert.alert('Error', 'Completa la pregunta, fecha límite y al menos 2 opciones.'); return;
+
+            if (!title.trim() || !body.trim()) {
+                Alert.alert('Error', 'Completa titulo y contenido.');
+                return;
             }
-            addPoll({
-                question: pollQuestion,
-                deadline: pollDeadline,
-                options: validOptions.map(text => ({ id: Math.random().toString(), text, votes: 0 })),
-                allowMultiple,
-                pushEnabled: sendPush
-            });
-            if (sendPush) await pushService.broadcastPushNotification(`📊 Nueva Encuesta`, pollQuestion, { type: 'poll' });
-            Alert.alert('✅ Encuesta publicada', sendPush ? 'Se ha enviado Notificación Push.' : '');
+
+            const payload = {
+                title: title.trim(),
+                body: body.trim(),
+                priority,
+                location: location.trim() || null,
+                schedule: schedule.trim() || null,
+                expires_at: noExpiry ? null : (expiresAtDate ? expiresAtDate.toISOString() : null),
+            };
+
+            try {
+                if (editId) {
+                    await announcementService.updateAnnouncement(editId, payload);
+                    Alert.alert('Aviso actualizado', 'El aviso quedo actualizado.');
+                } else {
+                    await announcementService.createAnnouncement({
+                        organization_id: organizationId,
+                        created_by: user.id,
+                        ...payload,
+                    });
+
+                    if (sendPush) {
+                        await pushService.broadcastPushNotification({
+                            organization_id: organizationId,
+                            title: `Nuevo aviso: ${payload.title}`,
+                            body: payload.body,
+                            type: 'announcement',
+                            payload: {
+                                priority: payload.priority,
+                                location: payload.location,
+                                schedule: payload.schedule,
+                            },
+                        });
+                    }
+
+                    Alert.alert('Aviso publicado', 'El aviso quedo disponible para la comunidad.');
+                }
+
+                await loadAnnouncements();
+                resetForm();
+            } catch (error: any) {
+                Alert.alert('Error', error.message || 'No se pudo guardar el aviso.');
+            }
+            return;
         }
-        cancelForm();
+
+        const validOptions = pollOptions.map((option) => option.trim()).filter(Boolean);
+        if (!pollQuestion.trim() || validOptions.length < 2 || !pollDeadline.trim()) {
+            Alert.alert('Error', 'Completa la pregunta, la fecha limite y al menos dos opciones.');
+            return;
+        }
+
+        if (!organizationId || !user) {
+            Alert.alert('Error', 'No se pudo resolver tu organizacion o usuario.');
+            return;
+        }
+
+        try {
+            await pollService.createPoll({
+                organizationId,
+                userId: user.id,
+                question: pollQuestion.trim(),
+                deadline: new Date(pollDeadline).toISOString(),
+                allowMultiple,
+                options: validOptions,
+            });
+
+            if (sendPush) {
+                await pushService.broadcastPushNotification({
+                    organization_id: organizationId,
+                    title: 'Nueva encuesta comunitaria',
+                    body: pollQuestion.trim(),
+                    type: 'poll',
+                    payload: {
+                        deadline: pollDeadline,
+                        allowMultiple,
+                    },
+                });
+            }
+
+            await loadPolls();
+            Alert.alert('Encuesta publicada', 'La encuesta quedo disponible para la comunidad.');
+            resetForm();
+        } catch (error: any) {
+            Alert.alert('Error', error.message || 'No se pudo publicar la encuesta.');
+        }
     };
 
     const handleDelete = (id: string, name: string, isPoll = false) => {
-        Alert.alert('¿Eliminar?', `"${name}" será eliminado permanentemente.`, [
+        Alert.alert('Eliminar', `"${name}" sera eliminado.`, [
             { text: 'Cancelar', style: 'cancel' },
-            { text: 'Eliminar', style: 'destructive', onPress: () => isPoll ? removePoll(id) : removeAnnouncement(id) },
+            {
+                text: 'Eliminar',
+                style: 'destructive',
+                onPress: async () => {
+                    try {
+                        if (isPoll) {
+                            await pollService.deletePoll(id);
+                            await loadPolls();
+                        } else {
+                            await announcementService.deleteAnnouncement(id);
+                            await loadAnnouncements();
+                        }
+                    } catch (error: any) {
+                        Alert.alert('Error', error.message || 'No se pudo eliminar.');
+                    }
+                },
+            },
         ]);
     };
 
-    const cancelForm = () => {
-        setShowForm(false); setEditId(null); setTitle(''); setBody(''); setLocation(''); setSchedule(''); setPriority('normal');
-        setPollQuestion(''); setPollOptions(['', '']); setPollDeadline(''); setAllowMultiple(false);
-        setSendPush(false); setNoExpiry(true); setExpiresAtDate(null);
-    };
-
-    const prevMonth = () => {
-        if (filterMonth === 0) { setFilterMonth(11); setFilterYear(y => y - 1); } else { setFilterMonth(m => m - 1); }
-    };
-    const nextMonth = () => {
-        if (filterMonth === 11) { setFilterMonth(0); setFilterYear(y => y + 1); } else { setFilterMonth(m => m + 1); }
-    };
-
-    const renderAvisoCard = (a: any) => (
-        <View key={a.id} style={s.card}>
-            <Text style={s.cardTitle}>{a.title}</Text>
-            {(a.schedule || a.location) && (
+    const renderAnnouncementCard = (announcement: CommunityAnnouncement) => (
+        <View key={announcement.id} style={s.card}>
+            <Text style={s.cardTitle}>{announcement.title}</Text>
+            {(announcement.schedule || announcement.location) && (
                 <Text style={s.cardMeta}>
-                    {a.schedule && `🗓 ${a.schedule}`} {a.schedule && a.location && ' • '} {a.location && `📍 ${a.location}`}
+                    {[announcement.schedule, announcement.location].filter(Boolean).join(' • ')}
                 </Text>
             )}
-            <Text style={s.cardBody} numberOfLines={2}>{a.body}</Text>
-            {a.expiresAt && <Text style={{ fontSize: 11, color: '#F59E0B', marginTop: 2 }}>⏰ Caduca: {new Date(a.expiresAt).toLocaleDateString('es-CL')}</Text>}
+            <Text style={s.cardBody} numberOfLines={2}>{announcement.body}</Text>
+            {announcement.expires_at && (
+                <Text style={s.expiryText}>
+                    Caduca: {new Date(announcement.expires_at).toLocaleDateString('es-CL')}
+                </Text>
+            )}
             <View style={s.cardFooter}>
-                <View style={[s.pBadge, { backgroundColor: a.priority === 'important' ? '#FEF2F2' : '#F0FDF4' }]}>
-                    <Text style={{ color: a.priority === 'important' ? '#EF4444' : '#22C55E', fontSize: 11, fontWeight: '600' }}>
-                        {a.priority === 'important' ? '🔴 Importante' : '🟢 Normal'}
+                <View style={[s.priorityBadge, announcement.priority === 'important' ? s.priorityImportant : s.priorityNormal]}>
+                    <Text style={[s.priorityText, announcement.priority === 'important' ? s.priorityImportantText : s.priorityNormalText]}>
+                        {announcement.priority === 'important' ? 'Importante' : 'Normal'}
                     </Text>
                 </View>
                 <View style={s.cardActions}>
-                    <TouchableOpacity onPress={() => startEdit(a)} style={s.editBtn}><Text style={s.editText}>✏️</Text></TouchableOpacity>
-                    <TouchableOpacity onPress={() => handleDelete(a.id, a.title)} style={s.deleteBtn}><Text style={s.deleteText}>🗑️</Text></TouchableOpacity>
+                    <TouchableOpacity onPress={() => startEdit(announcement)} style={s.actionButton}>
+                        <Text style={s.actionText}>Editar</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => handleDelete(announcement.id, announcement.title)} style={s.actionButton}>
+                        <Text style={[s.actionText, s.deleteText]}>Eliminar</Text>
+                    </TouchableOpacity>
                 </View>
             </View>
         </View>
     );
 
+    const loading = loadingAnnouncements || loadingPolls;
+
     return (
         <SafeAreaView style={s.safe}>
             <ScrollView contentContainerStyle={s.scroll}>
-                <Text style={s.title}>📢 Gestionar Avisos</Text>
+                <Text style={s.title}>Gestionar Avisos</Text>
+                {loading && <ActivityIndicator color="#2563EB" style={s.loader} />}
 
-                {/* Year dropdown */}
                 <TouchableOpacity style={s.yearDropdown} onPress={() => setShowYearPicker(true)}>
-                    <Text style={s.yearDropdownText}>📅 {filterYear}</Text>
-                    <Text style={s.yearDropdownArrow}>▾</Text>
+                    <Text style={s.yearDropdownText}>{filterYear}</Text>
+                    <Text style={s.yearDropdownArrow}>v</Text>
                 </TouchableOpacity>
 
-                {/* Month pills */}
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.monthScroll}>
-                    {MONTHS_SHORT.map((m, i) => (
-                        <TouchableOpacity key={i} style={[s.pill, filterMonth === i && s.pillActive]} onPress={() => setFilterMonth(i)}>
-                            <Text style={[s.pillText, filterMonth === i && s.pillTextActive]}>{m}</Text>
+                    {MONTHS_SHORT.map((month, index) => (
+                        <TouchableOpacity
+                            key={month}
+                            style={[s.pill, filterMonth === index && s.pillActive]}
+                            onPress={() => setFilterMonth(index)}
+                        >
+                            <Text style={[s.pillText, filterMonth === index && s.pillTextActive]}>{month}</Text>
                         </TouchableOpacity>
                     ))}
                 </ScrollView>
 
-                <TouchableOpacity style={s.newBtn} onPress={() => showForm ? cancelForm() : setShowForm(true)}>
-                    <Text style={s.newBtnText}>{showForm ? '✕ Cancelar' : '+ Nuevo Aviso'}</Text>
+                <TouchableOpacity style={s.newButton} onPress={() => (showForm ? resetForm() : setShowForm(true))}>
+                    <Text style={s.newButtonText}>{showForm ? 'Cancelar' : 'Nueva publicacion'}</Text>
                 </TouchableOpacity>
 
                 {showForm && (
                     <View style={s.form}>
                         <View style={s.typeSelector}>
-                            <TouchableOpacity style={[s.typeBtn, formType === 'aviso' && s.typeActive]} onPress={() => setFormType('aviso')}>
-                                <Text style={[s.typeText, formType === 'aviso' && s.typeTextActive]}>📢 Aviso</Text>
+                            <TouchableOpacity
+                                style={[s.typeButton, formType === 'aviso' && s.typeButtonActive]}
+                                onPress={() => setFormType('aviso')}
+                            >
+                                <Text style={[s.typeButtonText, formType === 'aviso' && s.typeButtonTextActive]}>Aviso</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity style={[s.typeBtn, formType === 'encuesta' && s.typeActive]} onPress={() => setFormType('encuesta')}>
-                                <Text style={[s.typeText, formType === 'encuesta' && s.typeTextActive]}>📊 Encuesta</Text>
+                            <TouchableOpacity
+                                style={[s.typeButton, formType === 'encuesta' && s.typeButtonActive]}
+                                onPress={() => setFormType('encuesta')}
+                            >
+                                <Text style={[s.typeButtonText, formType === 'encuesta' && s.typeButtonTextActive]}>Encuesta</Text>
                             </TouchableOpacity>
                         </View>
 
-                        <Text style={s.formTitle}>{editId ? '✏️ Editar Publicación' : `📝 nuev${formType === 'aviso' ? 'o Aviso' : 'a Encuesta'}`}</Text>
+                        <Text style={s.formTitle}>
+                            {editId ? 'Editar publicacion' : `Nueva ${formType === 'aviso' ? 'publicacion' : 'encuesta'}`}
+                        </Text>
 
                         {formType === 'aviso' ? (
                             <>
-                                <Text style={s.label}>Título</Text>
-                                <TextInput style={s.input} placeholder="Título del aviso" placeholderTextColor="#94A3B8" value={title} onChangeText={setTitle} />
-
-                                <Text style={s.label}>Fecha y Horario</Text>
-                                <TextInput style={s.input} placeholder="Ej: Sábado a las 10:00 hrs" placeholderTextColor="#94A3B8" value={schedule} onChangeText={setSchedule} />
-
+                                <Text style={s.label}>Titulo</Text>
+                                <TextInput
+                                    style={s.input}
+                                    placeholder="Titulo del aviso"
+                                    placeholderTextColor="#94A3B8"
+                                    value={title}
+                                    onChangeText={setTitle}
+                                />
+                                <Text style={s.label}>Fecha y horario</Text>
+                                <TextInput
+                                    style={s.input}
+                                    placeholder="Ej: Sabado 10:00"
+                                    placeholderTextColor="#94A3B8"
+                                    value={schedule}
+                                    onChangeText={setSchedule}
+                                />
                                 <Text style={s.label}>Lugar</Text>
-                                <TextInput style={s.input} placeholder="Ej: Sede Vecinal" placeholderTextColor="#94A3B8" value={location} onChangeText={setLocation} />
-
+                                <TextInput
+                                    style={s.input}
+                                    placeholder="Ej: Sede vecinal"
+                                    placeholderTextColor="#94A3B8"
+                                    value={location}
+                                    onChangeText={setLocation}
+                                />
                                 <Text style={s.label}>Contenido</Text>
-                                <TextInput style={[s.input, s.multiline]} placeholder="Escribe el contenido..." placeholderTextColor="#94A3B8" value={body} onChangeText={setBody} multiline numberOfLines={4} textAlignVertical="top" />
-
+                                <TextInput
+                                    style={[s.input, s.multiline]}
+                                    placeholder="Escribe el contenido"
+                                    placeholderTextColor="#94A3B8"
+                                    value={body}
+                                    onChangeText={setBody}
+                                    multiline
+                                    numberOfLines={4}
+                                    textAlignVertical="top"
+                                />
                                 <Text style={s.label}>Prioridad</Text>
-                                <View style={s.prioRow}>
-                                    <TouchableOpacity style={[s.prioChip, priority === 'normal' && s.prioActive]} onPress={() => setPriority('normal')}>
-                                        <Text style={[s.prioText, priority === 'normal' && s.prioTextActive]}>🟢 Normal</Text>
+                                <View style={s.priorityRow}>
+                                    <TouchableOpacity
+                                        style={[s.priorityChip, priority === 'normal' && s.priorityChipActive]}
+                                        onPress={() => setPriority('normal')}
+                                    >
+                                        <Text style={[s.priorityChipText, priority === 'normal' && s.priorityChipTextActive]}>Normal</Text>
                                     </TouchableOpacity>
-                                    <TouchableOpacity style={[s.prioChip, priority === 'important' && s.prioImportant]} onPress={() => setPriority('important')}>
-                                        <Text style={[s.prioText, priority === 'important' && s.prioTextActive]}>🔴 Importante</Text>
+                                    <TouchableOpacity
+                                        style={[s.priorityChip, priority === 'important' && s.priorityChipDanger]}
+                                        onPress={() => setPriority('important')}
+                                    >
+                                        <Text style={[s.priorityChipText, priority === 'important' && s.priorityChipTextActive]}>Importante</Text>
                                     </TouchableOpacity>
                                 </View>
-
                                 <Text style={s.label}>Fecha de caducidad</Text>
                                 <View style={s.expiryRow}>
-                                    <Text style={{ fontSize: 14, color: '#64748B', flex: 1 }}>No aplica (siempre visible)</Text>
-                                    <Switch value={noExpiry} onValueChange={(val) => { setNoExpiry(val); if (val) setExpiresAtDate(null); }} trackColor={{ false: '#CBD5E1', true: '#22C55E' }} thumbColor="#FFFFFF" />
+                                    <Text style={s.expiryLabel}>No aplica</Text>
+                                    <Switch
+                                        value={noExpiry}
+                                        onValueChange={(value) => {
+                                            setNoExpiry(value);
+                                            if (value) {
+                                                setExpiresAtDate(null);
+                                            }
+                                        }}
+                                        trackColor={{ false: '#CBD5E1', true: '#22C55E' }}
+                                        thumbColor="#FFFFFF"
+                                    />
                                 </View>
                                 {!noExpiry && (
                                     <>
-                                        <TouchableOpacity style={[s.input, { justifyContent: 'center', marginTop: 8 }]} onPress={() => setShowExpiryPicker(true)}>
+                                        <TouchableOpacity style={[s.input, s.dateInput]} onPress={() => setShowExpiryPicker(true)}>
                                             <Text style={{ color: expiresAtDate ? '#0F172A' : '#94A3B8' }}>
-                                                {expiresAtDate ? `📅 ${expiresAtDate.toLocaleDateString('es-CL')}` : 'Seleccionar fecha de caducidad...'}
+                                                {expiresAtDate
+                                                    ? expiresAtDate.toLocaleDateString('es-CL')
+                                                    : 'Seleccionar fecha de caducidad'}
                                             </Text>
                                         </TouchableOpacity>
                                         {showExpiryPicker && (
@@ -226,7 +495,9 @@ export default function ManageAnnouncementsScreen() {
                                                 minimumDate={new Date()}
                                                 onChange={(_, selectedDate) => {
                                                     setShowExpiryPicker(Platform.OS === 'ios');
-                                                    if (selectedDate) setExpiresAtDate(selectedDate);
+                                                    if (selectedDate) {
+                                                        setExpiresAtDate(selectedDate);
+                                                    }
                                                 }}
                                             />
                                         )}
@@ -236,10 +507,18 @@ export default function ManageAnnouncementsScreen() {
                         ) : (
                             <>
                                 <Text style={s.label}>Pregunta</Text>
-                                <TextInput style={s.input} placeholder="¿Qué día prefieres para la reunión?" placeholderTextColor="#94A3B8" value={pollQuestion} onChangeText={setPollQuestion} />
-                                <Text style={s.label}>Fecha Límite (Deadline)</Text>
-                                <TouchableOpacity style={[s.input, { justifyContent: 'center' }]} onPress={() => setShowDatePicker(true)}>
-                                    <Text style={{ color: pollDeadline ? '#0F172A' : '#94A3B8' }}>{pollDeadline || 'Seleccionar fecha límite...'}</Text>
+                                <TextInput
+                                    style={s.input}
+                                    placeholder="Pregunta de la encuesta"
+                                    placeholderTextColor="#94A3B8"
+                                    value={pollQuestion}
+                                    onChangeText={setPollQuestion}
+                                />
+                                <Text style={s.label}>Fecha limite</Text>
+                                <TouchableOpacity style={[s.input, s.dateInput]} onPress={() => setShowDatePicker(true)}>
+                                    <Text style={{ color: pollDeadline ? '#0F172A' : '#94A3B8' }}>
+                                        {pollDeadline || 'Seleccionar fecha limite'}
+                                    </Text>
                                 </TouchableOpacity>
                                 {showDatePicker && (
                                     <DateTimePicker
@@ -247,114 +526,148 @@ export default function ManageAnnouncementsScreen() {
                                         mode="date"
                                         display="default"
                                         minimumDate={new Date()}
-                                        onChange={(event, selectedDate) => {
-                                            setShowDatePicker(false);
-                                            if (selectedDate) setPollDeadline(selectedDate.toISOString().split('T')[0]);
+                                        onChange={(_, selectedDate) => {
+                                            setShowDatePicker(Platform.OS === 'ios');
+                                            if (selectedDate) {
+                                                setPollDeadline(selectedDate.toISOString().split('T')[0]);
+                                            }
                                         }}
                                     />
                                 )}
                                 <Text style={s.label}>Opciones</Text>
-                                {pollOptions.map((opt, i) => (
-                                    <TextInput key={i} style={[s.input, { marginBottom: 8 }]} placeholder={`Opción ${i + 1}`} placeholderTextColor="#94A3B8" value={opt} onChangeText={(text) => {
-                                        const newOpts = [...pollOptions]; newOpts[i] = text; setPollOptions(newOpts);
-                                    }} />
+                                {pollOptions.map((option, index) => (
+                                    <TextInput
+                                        key={`${index}-${option}`}
+                                        style={[s.input, s.optionInput]}
+                                        placeholder={`Opcion ${index + 1}`}
+                                        placeholderTextColor="#94A3B8"
+                                        value={option}
+                                        onChangeText={(text) => {
+                                            const updated = [...pollOptions];
+                                            updated[index] = text;
+                                            setPollOptions(updated);
+                                        }}
+                                    />
                                 ))}
                                 <TouchableOpacity onPress={() => setPollOptions([...pollOptions, ''])}>
-                                    <Text style={{ color: '#2563EB', fontWeight: 'bold', marginTop: 4 }}>+ Añadir opción</Text>
+                                    <Text style={s.addOptionText}>+ Anadir opcion</Text>
                                 </TouchableOpacity>
-
                                 <View style={s.pushToggleRow}>
-                                    <Text style={s.pushToggleLabel}>✅ Permitir múltiples respuestas</Text>
-                                    <Switch value={allowMultiple} onValueChange={setAllowMultiple} trackColor={{ false: '#CBD5E1', true: '#22C55E' }} thumbColor="#FFFFFF" />
+                                    <Text style={s.pushToggleLabel}>Permitir multiples respuestas</Text>
+                                    <Switch
+                                        value={allowMultiple}
+                                        onValueChange={setAllowMultiple}
+                                        trackColor={{ false: '#CBD5E1', true: '#22C55E' }}
+                                        thumbColor="#FFFFFF"
+                                    />
                                 </View>
                             </>
                         )}
 
                         {!editId && (
                             <View style={s.pushToggleRow}>
-                                <Text style={s.pushToggleLabel}>🔔 ¿Enviar Notificación Push a los vecinos?</Text>
-                                <Switch value={sendPush} onValueChange={setSendPush} trackColor={{ false: '#CBD5E1', true: '#22C55E' }} thumbColor="#FFFFFF" />
+                                <Text style={s.pushToggleLabel}>Enviar notificacion push</Text>
+                                <Switch
+                                    value={sendPush}
+                                    onValueChange={setSendPush}
+                                    trackColor={{ false: '#CBD5E1', true: '#22C55E' }}
+                                    thumbColor="#FFFFFF"
+                                />
                             </View>
                         )}
 
-                        <TouchableOpacity style={s.submitBtn} onPress={handleSave}>
-                            <Text style={s.submitText}>{editId ? '💾 Guardar Cambios' : '📤 Publicar'}</Text>
+                        <TouchableOpacity style={s.submitButton} onPress={handleSave} disabled={loading}>
+                            <Text style={s.submitButtonText}>{editId ? 'Guardar cambios' : 'Publicar'}</Text>
                         </TouchableOpacity>
                     </View>
                 )}
 
-                {/* Active Polls */}
                 {activePolls.length > 0 && (
                     <>
-                        <Text style={s.section}>📊 Encuestas Activas ({activePolls.length})</Text>
-                        {activePolls.map(p => (
-                            <View key={p.id} style={s.card}>
-                                <Text style={s.cardTitle}>📊 {p.question}</Text>
-                                <Text style={s.cardMeta}>Cierra: {p.deadline}</Text>
+                        <Text style={s.section}>Encuestas activas ({activePolls.length})</Text>
+                        {activePolls.map((poll) => (
+                            <View key={poll.id} style={s.card}>
+                                <Text style={s.cardTitle}>{poll.question}</Text>
+                                <Text style={s.cardMeta}>Cierra: {new Date(poll.deadline).toLocaleDateString('es-CL')}</Text>
                                 <View style={s.cardFooter}>
-                                    <View style={[s.pBadge, { backgroundColor: '#EFF6FF' }]}>
-                                        <Text style={{ color: '#2563EB', fontSize: 11, fontWeight: '600' }}>{p.votedBy.length} votos</Text>
+                                    <View style={[s.priorityBadge, s.pollBadge]}>
+                                        <Text style={[s.priorityText, s.pollBadgeText]}>{poll.totalVotes} votos</Text>
                                     </View>
-                                    <View style={s.cardActions}>
-                                        <TouchableOpacity onPress={() => handleDelete(p.id, p.question, true)} style={s.deleteBtn}><Text style={s.deleteText}>🗑️</Text></TouchableOpacity>
-                                    </View>
+                                    <TouchableOpacity onPress={() => handleDelete(poll.id, poll.question, true)} style={s.actionButton}>
+                                        <Text style={[s.actionText, s.deleteText]}>Eliminar</Text>
+                                    </TouchableOpacity>
                                 </View>
                             </View>
                         ))}
                     </>
                 )}
 
-                {/* Active Avisos */}
-                <Text style={s.section}>📢 Avisos activos ({activeAvisos.length})</Text>
-                {activeAvisos.map(renderAvisoCard)}
+                <Text style={s.section}>Avisos activos ({activeAnnouncements.length})</Text>
+                {activeAnnouncements.map(renderAnnouncementCard)}
 
-                {/* Historic Polls */}
                 {historicPolls.length > 0 && (
                     <>
-                        <TouchableOpacity style={s.historicBtn} onPress={() => setShowHistoricPolls(!showHistoricPolls)}>
-                            <Text style={s.historicBtnText}>{showHistoricPolls ? '▲ Ocultar' : '▼ Ver'} Encuestas Históricas ({historicPolls.length})</Text>
+                        <TouchableOpacity style={s.historicButton} onPress={() => setShowHistoricPolls((current) => !current)}>
+                            <Text style={s.historicButtonText}>
+                                {showHistoricPolls ? 'Ocultar' : 'Ver'} encuestas historicas ({historicPolls.length})
+                            </Text>
                         </TouchableOpacity>
-                        {showHistoricPolls && historicPolls.map(p => (
-                            <View key={p.id} style={[s.card, { opacity: 0.6 }]}>
-                                <Text style={s.cardTitle}>📊 {p.question}</Text>
-                                <Text style={s.cardMeta}>Cerrada: {p.deadline}</Text>
+                        {showHistoricPolls && historicPolls.map((poll) => (
+                            <View key={poll.id} style={[s.card, s.historicCard]}>
+                                <Text style={s.cardTitle}>{poll.question}</Text>
+                                <Text style={s.cardMeta}>Cerrada: {new Date(poll.deadline).toLocaleDateString('es-CL')}</Text>
                                 <View style={s.cardFooter}>
-                                    <View style={[s.pBadge, { backgroundColor: '#F1F5F9' }]}>
-                                        <Text style={{ color: '#94A3B8', fontSize: 11, fontWeight: '600' }}>{p.votedBy.length} votos</Text>
+                                    <View style={[s.priorityBadge, s.historicBadge]}>
+                                        <Text style={[s.priorityText, s.historicBadgeText]}>{poll.totalVotes} votos</Text>
                                     </View>
-                                    <TouchableOpacity onPress={() => handleDelete(p.id, p.question, true)} style={s.deleteBtn}><Text style={s.deleteText}>🗑️</Text></TouchableOpacity>
+                                    <TouchableOpacity onPress={() => handleDelete(poll.id, poll.question, true)} style={s.actionButton}>
+                                        <Text style={[s.actionText, s.deleteText]}>Eliminar</Text>
+                                    </TouchableOpacity>
                                 </View>
                             </View>
                         ))}
                     </>
                 )}
 
-                {/* Historic Avisos */}
-                {historicAvisos.length > 0 && (
+                {historicAnnouncements.length > 0 && (
                     <>
-                        <TouchableOpacity style={s.historicBtn} onPress={() => setShowHistoricAvisos(!showHistoricAvisos)}>
-                            <Text style={s.historicBtnText}>{showHistoricAvisos ? '▲ Ocultar' : '▼ Ver'} Avisos Históricos ({historicAvisos.length})</Text>
+                        <TouchableOpacity style={s.historicButton} onPress={() => setShowHistoricAvisos((current) => !current)}>
+                            <Text style={s.historicButtonText}>
+                                {showHistoricAvisos ? 'Ocultar' : 'Ver'} avisos historicos ({historicAnnouncements.length})
+                            </Text>
                         </TouchableOpacity>
-                        {showHistoricAvisos && historicAvisos.map(renderAvisoCard)}
+                        {showHistoricAvisos && historicAnnouncements.map(renderAnnouncementCard)}
                     </>
                 )}
 
-                {/* Year picker modal */}
                 <Modal visible={showYearPicker} transparent animationType="fade">
                     <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => setShowYearPicker(false)}>
                         <View style={s.modalContent}>
-                            <Text style={s.modalTitle}>Seleccionar Año</Text>
-                            <ScrollView style={{ maxHeight: 350 }} ref={yearScrollRef}
+                            <Text style={s.modalTitle}>Seleccionar ano</Text>
+                            <ScrollView
+                                style={s.yearList}
+                                ref={yearScrollRef}
                                 onLayout={() => {
-                                    const idx = YEARS.indexOf(filterYear);
-                                    if (idx >= 0 && yearScrollRef.current) {
-                                        yearScrollRef.current.scrollTo({ y: Math.max(0, idx * 50 - 100), animated: false });
+                                    const index = YEARS.indexOf(filterYear);
+                                    if (index >= 0 && yearScrollRef.current) {
+                                        yearScrollRef.current.scrollTo({
+                                            y: Math.max(0, index * 48 - 96),
+                                            animated: false,
+                                        });
                                     }
-                                }}>
-                                {YEARS.map(y => (
-                                    <TouchableOpacity key={y} style={[s.yearOption, filterYear === y && s.yearOptionActive]} onPress={() => { setFilterYear(y); setShowYearPicker(false); }}>
-                                        <Text style={[s.yearOptionText, filterYear === y && s.yearOptionTextActive]}>{y}</Text>
-                                        {filterYear === y && <Text style={s.yearCheck}>✓</Text>}
+                                }}
+                            >
+                                {YEARS.map((year) => (
+                                    <TouchableOpacity
+                                        key={year}
+                                        style={[s.yearOption, filterYear === year && s.yearOptionActive]}
+                                        onPress={() => {
+                                            setFilterYear(year);
+                                            setShowYearPicker(false);
+                                        }}
+                                    >
+                                        <Text style={[s.yearOptionText, filterYear === year && s.yearOptionTextActive]}>{year}</Text>
+                                        {filterYear === year && <Text style={s.yearCheck}>OK</Text>}
                                     </TouchableOpacity>
                                 ))}
                             </ScrollView>
@@ -367,9 +680,21 @@ export default function ManageAnnouncementsScreen() {
 }
 
 const s = StyleSheet.create({
-    safe: { flex: 1, backgroundColor: 'transparent' }, scroll: { padding: 20 },
+    safe: { flex: 1, backgroundColor: 'transparent' },
+    scroll: { padding: 20 },
     title: { fontSize: 24, fontWeight: 'bold', color: '#1E3A5F', marginBottom: 16 },
-    yearDropdown: { backgroundColor: '#FFFFFF', borderRadius: 12, padding: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: '#E2E8F0', elevation: 1, marginBottom: 8 },
+    loader: { marginBottom: 12 },
+    yearDropdown: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 12,
+        padding: 12,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        marginBottom: 8,
+    },
     yearDropdownText: { fontSize: 16, fontWeight: '600', color: '#1E3A5F' },
     yearDropdownArrow: { fontSize: 16, color: '#94A3B8' },
     monthScroll: { marginBottom: 12 },
@@ -377,46 +702,82 @@ const s = StyleSheet.create({
     pillActive: { backgroundColor: '#2563EB' },
     pillText: { fontSize: 13, color: '#64748B', fontWeight: '500' },
     pillTextActive: { color: '#FFFFFF' },
-    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 24 },
-    modalContent: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 20, width: '100%', maxWidth: 300 },
-    modalTitle: { fontSize: 20, fontWeight: 'bold', color: '#1E3A5F', marginBottom: 16, textAlign: 'center' },
-    yearOption: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
-    yearOptionActive: { backgroundColor: '#EFF6FF', borderRadius: 8, paddingHorizontal: 8 },
-    yearOptionText: { fontSize: 16, color: '#334155' },
-    yearOptionTextActive: { fontWeight: 'bold', color: '#2563EB' },
-    yearCheck: { fontSize: 16, color: '#2563EB', fontWeight: 'bold' },
-    newBtn: { backgroundColor: '#2563EB', borderRadius: 12, padding: 14, alignItems: 'center', marginBottom: 16 },
-    newBtnText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 16 },
-    typeSelector: { flexDirection: 'row', backgroundColor: '#F1F5F9', borderRadius: 10, padding: 4, marginBottom: 16 },
-    typeBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 8 },
-    typeActive: { backgroundColor: '#FFFFFF', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 2 },
-    typeText: { fontSize: 14, fontWeight: '600', color: '#64748B' },
-    typeTextActive: { color: '#0F172A' },
+    newButton: { backgroundColor: '#2563EB', borderRadius: 12, padding: 14, alignItems: 'center', marginBottom: 16 },
+    newButtonText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 16 },
     form: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, marginBottom: 20, elevation: 2 },
+    typeSelector: { flexDirection: 'row', backgroundColor: '#F1F5F9', borderRadius: 10, padding: 4, marginBottom: 16 },
+    typeButton: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 8 },
+    typeButtonActive: {
+        backgroundColor: '#FFFFFF',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 2,
+        elevation: 2,
+    },
+    typeButtonText: { fontSize: 14, fontWeight: '600', color: '#64748B' },
+    typeButtonTextActive: { color: '#0F172A' },
     formTitle: { fontSize: 18, fontWeight: 'bold', color: '#1E3A5F', marginBottom: 8 },
     label: { fontSize: 13, fontWeight: '600', color: '#64748B', marginBottom: 6, marginTop: 10 },
     input: { backgroundColor: 'transparent', borderRadius: 10, padding: 12, fontSize: 15, color: '#0F172A', borderWidth: 1, borderColor: '#E2E8F0' },
     multiline: { minHeight: 80 },
-    prioRow: { flexDirection: 'row', gap: 8 },
-    prioChip: { flex: 1, backgroundColor: 'transparent', borderRadius: 8, padding: 10, alignItems: 'center', borderWidth: 1, borderColor: '#E2E8F0' },
-    prioActive: { backgroundColor: '#F0FDF4', borderColor: '#22C55E' },
-    prioImportant: { backgroundColor: '#FEF2F2', borderColor: '#EF4444' },
-    prioText: { fontSize: 13, color: '#64748B' }, prioTextActive: { fontWeight: '700', color: '#0F172A' },
+    priorityRow: { flexDirection: 'row', gap: 8 },
+    priorityChip: { flex: 1, backgroundColor: 'transparent', borderRadius: 8, padding: 10, alignItems: 'center', borderWidth: 1, borderColor: '#E2E8F0' },
+    priorityChipActive: { backgroundColor: '#F0FDF4', borderColor: '#22C55E' },
+    priorityChipDanger: { backgroundColor: '#FEF2F2', borderColor: '#EF4444' },
+    priorityChipText: { fontSize: 13, color: '#64748B' },
+    priorityChipTextActive: { fontWeight: '700', color: '#0F172A' },
     expiryRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', borderRadius: 10, padding: 12, borderWidth: 1, borderColor: '#E2E8F0' },
-    submitBtn: { backgroundColor: '#22C55E', borderRadius: 10, padding: 14, alignItems: 'center', marginTop: 16 },
-    submitText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 16 },
-    pushToggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 24, marginBottom: 8, padding: 12, backgroundColor: '#F8FAFC', borderRadius: 10, borderWidth: 1, borderColor: '#E2E8F0' },
+    expiryLabel: { fontSize: 14, color: '#64748B', flex: 1 },
+    dateInput: { justifyContent: 'center', marginTop: 8 },
+    optionInput: { marginBottom: 8 },
+    addOptionText: { color: '#2563EB', fontWeight: 'bold', marginTop: 4 },
+    pushToggleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginTop: 24,
+        marginBottom: 8,
+        padding: 12,
+        backgroundColor: '#F8FAFC',
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+    },
     pushToggleLabel: { fontSize: 14, fontWeight: '600', color: '#1E3A5F', flex: 1 },
+    submitButton: { backgroundColor: '#22C55E', borderRadius: 10, padding: 14, alignItems: 'center', marginTop: 16 },
+    submitButtonText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 16 },
     section: { fontSize: 16, fontWeight: 'bold', color: '#64748B', marginBottom: 10, marginTop: 10 },
     card: { backgroundColor: '#FFFFFF', borderRadius: 12, padding: 14, marginBottom: 10, elevation: 1 },
     cardTitle: { fontSize: 15, fontWeight: 'bold', color: '#0F172A' },
     cardMeta: { fontSize: 12, color: '#3B82F6', marginTop: 4, fontWeight: '500' },
     cardBody: { fontSize: 13, color: '#64748B', marginTop: 4 },
+    expiryText: { fontSize: 11, color: '#F59E0B', marginTop: 4 },
     cardFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 },
-    pBadge: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
+    priorityBadge: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
+    priorityNormal: { backgroundColor: '#F0FDF4' },
+    priorityImportant: { backgroundColor: '#FEF2F2' },
+    priorityText: { fontSize: 11, fontWeight: '600' },
+    priorityNormalText: { color: '#22C55E' },
+    priorityImportantText: { color: '#EF4444' },
+    pollBadge: { backgroundColor: '#EFF6FF' },
+    pollBadgeText: { color: '#2563EB' },
+    historicBadge: { backgroundColor: '#F1F5F9' },
+    historicBadgeText: { color: '#94A3B8' },
     cardActions: { flexDirection: 'row', gap: 8 },
-    editBtn: { padding: 6 }, editText: { fontSize: 18 },
-    deleteBtn: { padding: 6 }, deleteText: { fontSize: 18 },
-    historicBtn: { backgroundColor: '#F1F5F9', borderRadius: 10, padding: 12, alignItems: 'center', marginTop: 16, marginBottom: 8 },
-    historicBtnText: { color: '#64748B', fontWeight: '600', fontSize: 14 },
+    actionButton: { paddingVertical: 6, paddingHorizontal: 8 },
+    actionText: { fontSize: 13, fontWeight: '600', color: '#2563EB' },
+    deleteText: { color: '#DC2626' },
+    historicButton: { backgroundColor: '#F1F5F9', borderRadius: 10, padding: 12, alignItems: 'center', marginTop: 16, marginBottom: 8 },
+    historicButtonText: { color: '#64748B', fontWeight: '600', fontSize: 14 },
+    historicCard: { opacity: 0.7 },
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+    modalContent: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 20, width: '100%', maxWidth: 300 },
+    modalTitle: { fontSize: 20, fontWeight: 'bold', color: '#1E3A5F', marginBottom: 16, textAlign: 'center' },
+    yearList: { maxHeight: 350 },
+    yearOption: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
+    yearOptionActive: { backgroundColor: '#EFF6FF', borderRadius: 8, paddingHorizontal: 8 },
+    yearOptionText: { fontSize: 16, color: '#334155' },
+    yearOptionTextActive: { fontWeight: 'bold', color: '#2563EB' },
+    yearCheck: { fontSize: 12, color: '#2563EB', fontWeight: 'bold' },
 });

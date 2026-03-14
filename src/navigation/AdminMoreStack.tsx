@@ -8,6 +8,7 @@ import NeighborhoodMapScreen from '../screens/user/NeighborhoodMapScreen';
 import FavoresScreen from '../screens/user/FavoresScreen';
 import EventsScreen from '../screens/user/EventsScreen';
 import DirectivaScreen from '../screens/user/DirectivaScreen';
+import DeleteAccountScreen from '../screens/shared/DeleteAccountScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -22,6 +23,7 @@ export default function AdminMoreStack() {
             <Stack.Screen name="Favores" component={FavoresScreen} />
             <Stack.Screen name="Agenda" component={EventsScreen} />
             <Stack.Screen name="Directiva" component={DirectivaScreen} />
+            <Stack.Screen name="DeleteAccount" component={DeleteAccountScreen} />
         </Stack.Navigator>
     );
 }

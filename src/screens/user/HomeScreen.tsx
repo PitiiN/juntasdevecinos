@@ -6,24 +6,23 @@ import * as Speech from 'expo-speech';
 import { useAuth } from '../../context/AuthContext';
 import { useAppStore } from '../../lib/store';
 import { useAccessibility } from '../../context/AccessibilityContext';
+import { useTicketCounters } from '../../hooks/useTicketCounters';
 
 export default function HomeScreen() {
-    const { user, organizationLogoUrl, organizationName } = useAuth();
+    const { user, organizationId, organizationLogoUrl, organizationName } = useAuth();
     const navigation = useNavigation<any>();
     const announcements = useAppStore(s => s.announcements);
-    const solicitudes = useAppStore(s => s.solicitudes);
     const documents = useAppStore(s => s.documents);
     const seenAvisosCount = useAppStore(s => s.seenAvisosCount);
     const seenDocsCount = useAppStore(s => s.seenDocsCount);
     const markAvisosSeen = useAppStore(s => s.markAvisosSeen);
     const { ttsEnabled } = useAccessibility();
     const displayName = user?.user_metadata?.full_name || 'Vecino';
-    const mySolicitudes = solicitudes.filter(s => s.userEmail === user?.email || s.user === user?.user_metadata?.full_name);
-    const unreadSolicitudes = mySolicitudes.filter(s => !s.seenByUser).length;
     const [speaking, setSpeaking] = useState<string | null>(null);
 
     const unreadAvisos = Math.max(0, announcements.length - (seenAvisosCount || 0));
     const unreadDocs = Math.max(0, documents.length - seenDocsCount);
+    const { myUnreadCount: unreadSolicitudes } = useTicketCounters(organizationId);
 
     useFocusEffect(
         useCallback(() => {

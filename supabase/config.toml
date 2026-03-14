@@ -1,0 +1,5 @@
+[functions.delete_account]
+verify_jwt = false
+
+[functions.send_push]
+verify_jwt = false

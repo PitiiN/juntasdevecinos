@@ -1,0 +1,169 @@
+{
+  "generatedAt": "2026-03-14T14:37:10.716Z",
+  "target": "https://cuwikwegsopfxlubrvsp.supabase.co",
+  "tests": [
+    {
+      "category": "fixture",
+      "name": "member-a-only-org-a",
+      "passed": true,
+      "evidence": [
+        {
+          "organization_id": "da13efe6-619e-4e2e-ad7d-b8a50e591f7e",
+          "role": "member",
+          "organization_name": "Security Audit JJVV A",
+          "organization_logo_url": null,
+          "organization_directiva_image_url": null
+        }
+      ],
+      "note": "Member A should only see organization A."
+    },
+    {
+      "category": "fixture",
+      "name": "outsider-sees-no-orgs",
+      "passed": true,
+      "evidence": [],
+      "note": "The outsider user should remain without memberships."
+    },
+    {
+      "category": "same-org-privacy",
+      "name": "member-a-cannot-read-president-a-private-profile",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "body": [],
+        "rawBody": "[]"
+      },
+      "note": "A member should not be able to read another neighbor profile fields such as phone, RUT or address."
+    },
+    {
+      "category": "setup",
+      "name": "president-a-create-announcement-a",
+      "passed": true,
+      "evidence": {
+        "status": 201,
+        "body": null,
+        "rawBody": ""
+      },
+      "note": "President A should be able to create content in organization A."
+    },
+    {
+      "category": "setup",
+      "name": "president-a-create-finance-a",
+      "passed": true,
+      "evidence": {
+        "status": 201,
+        "body": null,
+        "rawBody": ""
+      },
+      "note": "President A should be able to create finance entries in organization A."
+    },
+    {
+      "category": "cross-org-read",
+      "name": "member-a-cannot-read-org-b-announcements",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "body": [],
+        "rawBody": "[]"
+      },
+      "note": "A member from org A must not read org B announcements."
+    },
+    {
+      "category": "outsider-read",
+      "name": "outsider-cannot-read-org-a-finance",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "body": [],
+        "rawBody": "[]"
+      },
+      "note": "An authenticated outsider must not read finance entries from a JJVV."
+    },
+    {
+      "category": "outsider-write",
+      "name": "outsider-cannot-create-alert-org-a",
+      "passed": true,
+      "evidence": {
+        "status": 403,
+        "body": {
+          "code": "42501",
+          "details": null,
+          "hint": null,
+          "message": "new row violates row-level security policy for table \"alerts\""
+        },
+        "rawBody": "{\"code\":\"42501\",\"details\":null,\"hint\":null,\"message\":\"new row violates row-level security policy for table \\\"alerts\\\"\"}"
+      },
+      "note": "An outsider must not create content in organization A."
+    },
+    {
+      "category": "cross-org-admin",
+      "name": "secretary-b-cannot-change-org-a-membership",
+      "passed": true,
+      "evidence": {
+        "status": 400,
+        "body": {
+          "code": "P0001",
+          "details": null,
+          "hint": null,
+          "message": "Insufficient privileges"
+        },
+        "rawBody": "{\"code\":\"P0001\",\"details\":null,\"hint\":null,\"message\":\"Insufficient privileges\"}"
+      },
+      "note": "An admin from org B must not mutate memberships in org A."
+    },
+    {
+      "category": "cross-org-admin",
+      "name": "president-a-cannot-write-finance-org-b",
+      "passed": true,
+      "evidence": {
+        "status": 403,
+        "body": {
+          "code": "42501",
+          "details": null,
+          "hint": null,
+          "message": "new row violates row-level security policy for table \"finance_entries\""
+        },
+        "rawBody": "{\"code\":\"42501\",\"details\":null,\"hint\":null,\"message\":\"new row violates row-level security policy for table \\\"finance_entries\\\"\"}"
+      },
+      "note": "A president from org A must not write finance entries in org B."
+    },
+    {
+      "category": "setup",
+      "name": "member-a-create-ticket-org-a",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "body": {
+          "id": "89e495b5-7928-4cf9-b5fe-10d64f34323a",
+          "organization_id": "da13efe6-619e-4e2e-ad7d-b8a50e591f7e",
+          "created_by": "abb9db43-3c66-4965-bf69-65b05405cda2",
+          "title": "Matrix member A ticket",
+          "description": "Matrix member A ticket",
+          "category": "general",
+          "status": "open",
+          "assigned_to": null,
+          "created_at": "2026-03-14T14:37:16.307047+00:00",
+          "updated_at": "2026-03-14T14:37:16.307047+00:00",
+          "tracking_code": "SOL-202603-000004",
+          "attachment_path": null,
+          "last_user_viewed_at": "2026-03-14T14:37:16.307047+00:00",
+          "last_admin_viewed_at": null,
+          "closed_at": null
+        },
+        "rawBody": "{\"id\":\"89e495b5-7928-4cf9-b5fe-10d64f34323a\",\"organization_id\":\"da13efe6-619e-4e2e-ad7d-b8a50e591f7e\",\"created_by\":\"abb9db43-3c66-4965-bf69-65b05405cda2\",\"title\":\"Matrix member A ticket\",\"description\":\"Matrix member A ticket\",\"category\":\"general\",\"status\":\"open\",\"assigned_to\":null,\"created_at\":\"2026-03-14T14:37:16.307047+00:00\",\"updated_at\":\"2026-03-14T14:37:16.307047+00:00\",\"tracking_code\":\"SOL-202603-000004\",\"attachment_path\":null,\"last_user_viewed_at\":\"2026-03-14T14:37:16.307047+00:00\",\"last_admin_viewed_at\":null,\"closed_at\":null}"
+      },
+      "note": "Member A should be able to create their own ticket in org A."
+    },
+    {
+      "category": "cross-org-admin",
+      "name": "secretary-b-cannot-read-org-a-ticket-comments",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "body": [],
+        "rawBody": "[]"
+      },
+      "note": "An admin from org B must not read ticket discussions from org A."
+    }
+  ]
+}

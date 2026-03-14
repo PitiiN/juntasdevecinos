@@ -1,11 +1,13 @@
-import React, { useState, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Paths, File } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import XLSX from 'xlsx';
-import { Buffer } from 'buffer';
 import { useAppStore, formatCLP } from '../../lib/store';
+import { useAuth } from '../../context/AuthContext';
+import { duesService } from '../../services/duesService';
+import { financeService, FinanceViewItem } from '../../services/financeService';
 
 const MONTHS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 
@@ -14,7 +16,11 @@ const YEARS: number[] = [];
 for (let y = 2000; y <= 2040; y++) YEARS.push(y);
 
 export default function AdminFinanceScreen({ navigation }: any) {
-    const { finances, memberDues, members, addFinanceEntry, updateFinanceEntry, removeFinanceEntry, updateMemberDue, rejectDue } = useAppStore();
+    const { organizationId, user } = useAuth();
+    const { memberDues, members } = useAppStore();
+    const setMembers = useAppStore(s => s.setMembers);
+    const setMemberDues = useAppStore(s => s.setMemberDues);
+    const [finances, setFinances] = useState<FinanceViewItem[]>([]);
     const [tab, setTab] = useState<'movimientos' | 'cuotas'>('movimientos');
     const [showForm, setShowForm] = useState(false);
     const [editId, setEditId] = useState<string | null>(null);
@@ -35,6 +41,68 @@ export default function AdminFinanceScreen({ navigation }: any) {
     const [rejectReason, setRejectReason] = useState('DOCUMENTO_ILEGIBLE');
     const [rejectComment, setRejectComment] = useState('');
 
+    const loadFinanceContext = useCallback(async () => {
+        if (!organizationId) {
+            setFinances([]);
+            setMembers([]);
+            setMemberDues([]);
+            return;
+        }
+
+        try {
+            const [remoteDues, remoteFinances] = await Promise.all([
+                duesService.getOrganizationDues(organizationId, {}),
+                financeService.getFinances(organizationId),
+            ]);
+            const mappedMembers = Array.from(
+                new Map(
+                    remoteDues.map((due) => ([
+                        due.memberId,
+                        {
+                            id: due.memberId,
+                            name: due.memberName || 'Vecino',
+                            email: '',
+                            role: 'member',
+                            active: true,
+                        },
+                    ]))
+                ).values()
+            );
+
+            setFinances(remoteFinances);
+            setMembers(mappedMembers);
+            setMemberDues(remoteDues.map((due) => ({
+                id: due.id,
+                memberId: due.memberId,
+                memberName: due.memberName,
+                month: due.month,
+                year: due.year,
+                amount: due.amount,
+                status: due.status,
+                paidDate: due.paidDate,
+                receiptUri: due.proofUrl || due.proofPath || undefined,
+                rejectionReason: due.rejectionReason || undefined,
+                adminComment: due.rejectionComment || undefined,
+                voucherId: due.voucherId,
+            })));
+        } catch (error: any) {
+            Alert.alert('Error', error.message || 'No se pudo cargar la informacion financiera.');
+        }
+    }, [organizationId, setMemberDues, setMembers]);
+
+    useEffect(() => {
+        void loadFinanceContext();
+    }, [loadFinanceContext]);
+
+    const refreshDuesAfter = async (action: () => Promise<void>) => {
+        try {
+            await action();
+            await loadFinanceContext();
+        } catch (error: any) {
+            Alert.alert('Error', error.message || 'No se pudo actualizar la cuota.');
+        }
+    };
+
     const totalIncome = finances.filter(f => f.type === 'income').reduce((a, b) => a + b.amount, 0);
     const totalExpense = finances.filter(f => f.type === 'expense').reduce((a, b) => a + b.amount, 0);
 
@@ -46,22 +114,66 @@ export default function AdminFinanceScreen({ navigation }: any) {
         setEditId(f.id); setType(f.type); setCategory(f.category); setDescription(f.description); setAmount(f.amount.toString()); setShowForm(true);
     };
 
-    const handleSave = () => {
-        if (!category || !description || !amount) { Alert.alert('Error', 'Completa todos los campos.'); return; }
-        if (editId) {
-            updateFinanceEntry(editId, { type, category, description, amount: parseInt(amount) });
-            Alert.alert('✅ Registro actualizado');
-        } else {
-            addFinanceEntry({ type, category, description, amount: parseInt(amount), date: new Date().toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' }) });
-            Alert.alert('✅ Registro guardado');
+    const handleSave = async () => {
+        if (!organizationId || !user?.id) {
+            Alert.alert('Error', 'No se pudo identificar la organizacion activa.');
+            return;
         }
-        setShowForm(false); setEditId(null); setCategory(''); setDescription(''); setAmount('');
+
+        if (!category || !description || !amount) {
+            Alert.alert('Error', 'Completa todos los campos.');
+            return;
+        }
+
+        try {
+            if (editId) {
+                await financeService.updateEntry(editId, {
+                    type,
+                    category,
+                    description,
+                    amount: parseInt(amount, 10),
+                });
+                Alert.alert('Registro actualizado');
+            } else {
+                await financeService.createEntry({
+                    organizationId,
+                    type,
+                    category,
+                    description,
+                    amount: parseInt(amount, 10),
+                    createdBy: user.id,
+                });
+                Alert.alert('Registro guardado');
+            }
+
+            setShowForm(false);
+            setEditId(null);
+            setCategory('');
+            setDescription('');
+            setAmount('');
+            await loadFinanceContext();
+        } catch (error: any) {
+            Alert.alert('Error', error.message || 'No se pudo guardar el registro.');
+        }
     };
 
     const handleDelete = (id: string) => {
-        Alert.alert('¿Eliminar?', 'Este registro será eliminado.', [
+        Alert.alert('Eliminar?', 'Este registro sera eliminado.', [
             { text: 'Cancelar', style: 'cancel' },
-            { text: 'Eliminar', style: 'destructive', onPress: () => removeFinanceEntry(id) },
+            {
+                text: 'Eliminar',
+                style: 'destructive',
+                onPress: () => {
+                    void (async () => {
+                        try {
+                            await financeService.deleteEntry(id);
+                            await loadFinanceContext();
+                        } catch (error: any) {
+                            Alert.alert('Error', error.message || 'No se pudo eliminar el registro.');
+                        }
+                    })();
+                },
+            },
         ]);
     };
 
@@ -70,28 +182,33 @@ export default function AdminFinanceScreen({ navigation }: any) {
             Alert.alert(`Validar Cuota ${MONTHS[due.month - 1]}`, `Socio: ${due.memberName}\n\nSelecciona la acción a tomar tras revisar el comprobante:`, [
                 { text: 'Cancelar', style: 'cancel' },
                 { text: '❌ Rechazar Pago', style: 'destructive', onPress: () => setRejectingDue(due) },
-                { text: '✅ Aprobar', onPress: () => updateMemberDue(due.id, 'paid', new Date().toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' })) },
+                { text: '✅ Aprobar', onPress: () => { void refreshDuesAfter(() => duesService.approveDue(due.id)); } },
             ]);
         } else if (due.status !== 'paid') {
             Alert.alert('Marcar como pagada', `¿Registrar pago manual de ${MONTHS[due.month - 1]} ${due.year} para ${due.memberName}?`, [
                 { text: 'Cancelar', style: 'cancel' },
-                { text: 'Confirmar', onPress: () => updateMemberDue(due.id, 'paid', new Date().toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' })) },
+                { text: 'Confirmar', onPress: () => { void refreshDuesAfter(() => duesService.setDueStatus(due.id, 'paid')); } },
             ]);
         } else {
             Alert.alert('Revertir pago', `¿Desmarcar como pagada la cuota de ${MONTHS[due.month - 1]} ${due.year} para ${due.memberName}?`, [
                 { text: 'Cancelar', style: 'cancel' },
-                { text: 'Revertir', style: 'destructive', onPress: () => updateMemberDue(due.id, 'pending', undefined) },
+                { text: 'Revertir', style: 'destructive', onPress: () => { void refreshDuesAfter(() => duesService.setDueStatus(due.id, 'due')); } },
             ]);
         }
     };
 
-    const confirmRejection = () => {
+    const confirmRejection = async () => {
         if (!rejectingDue) return;
-        rejectDue(rejectingDue.id, rejectReason, rejectComment);
-        setRejectingDue(null);
-        setRejectReason('DOCUMENTO_ILEGIBLE');
-        setRejectComment('');
-        Alert.alert('Pago rechazado', 'Se ha notificado al socio.');
+        try {
+            await duesService.rejectDue(rejectingDue.id, rejectReason, rejectComment);
+            await loadFinanceContext();
+            setRejectingDue(null);
+            setRejectReason('DOCUMENTO_ILEGIBLE');
+            setRejectComment('');
+            Alert.alert('Pago rechazado', 'Se ha actualizado el estado del comprobante.');
+        } catch (error: any) {
+            Alert.alert('Error', error.message || 'No se pudo rechazar el comprobante.');
+        }
     };
 
     const exportExcel = async (reportType: 'finance' | 'dues') => {
@@ -456,3 +573,7 @@ const s = StyleSheet.create({
     pendingName: { fontSize: 14, fontWeight: 'bold', color: '#1E3A5F' },
     pendingDesc: { fontSize: 12, color: '#64748B' },
 });
+
+
+
+

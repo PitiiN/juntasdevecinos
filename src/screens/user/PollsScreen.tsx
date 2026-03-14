@@ -1,76 +1,109 @@
-import React, { useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import React from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import { useAppStore } from '../../lib/store';
 import { useAuth } from '../../context/AuthContext';
+import { CommunityPoll, pollService } from '../../services/pollService';
 
 export default function PollsScreen() {
-    const polls = useAppStore(s => s.polls);
-    const votePoll = useAppStore(s => s.votePoll);
-    const { user } = useAuth();
+    const { user, organizationId } = useAuth();
+    const [polls, setPolls] = React.useState<CommunityPoll[]>([]);
+    const [loading, setLoading] = React.useState(false);
+    const [submittingVote, setSubmittingVote] = React.useState<string | null>(null);
 
-    // Filter non-expired polls
-    const activePolls = polls.filter(p => {
-        const isPollExpired = new Date() > new Date(p.deadline);
-        return !isPollExpired;
-    });
+    const loadPolls = React.useCallback(async () => {
+        if (!organizationId) return;
+        setLoading(true);
+        try {
+            const data = await pollService.getPolls(organizationId);
+            setPolls(data);
+        } catch (error: any) {
+            Alert.alert('Error', error.message || 'No se pudieron cargar las encuestas.');
+        } finally {
+            setLoading(false);
+        }
+    }, [organizationId]);
+
+    useFocusEffect(
+        React.useCallback(() => {
+            loadPolls();
+        }, [loadPolls])
+    );
+
+    const handleVote = async (poll: CommunityPoll, optionId: string) => {
+        if (!user?.id) return;
+        setSubmittingVote(poll.id);
+        try {
+            await pollService.submitVote({
+                pollId: poll.id,
+                optionId,
+                userId: user.id,
+                allowMultiple: poll.allowMultiple,
+                currentVotes: poll.myOptionIds,
+            });
+            await loadPolls();
+        } catch (error: any) {
+            Alert.alert('Error', error.message || 'No se pudo registrar tu voto.');
+        } finally {
+            setSubmittingVote(null);
+        }
+    };
+
+    const activePolls = polls.filter(poll => new Date() <= new Date(poll.deadline));
 
     return (
         <SafeAreaView style={s.safe}>
             <View style={s.header}>
-                <Text style={s.title}>📊 Encuestas</Text>
+                <Text style={s.title}>Encuestas</Text>
             </View>
             <ScrollView contentContainerStyle={s.scroll}>
-                {activePolls.length === 0 ? (
+                {loading && <ActivityIndicator color="#2563EB" style={{ marginBottom: 12 }} />}
+                {!loading && activePolls.length === 0 ? (
                     <View style={s.empty}><Text style={s.emptyText}>No hay encuestas activas por el momento</Text></View>
                 ) : (
-                    activePolls.map(p => {
-                        const isExpired = new Date() > new Date(p.deadline);
-                        const userVotesMap = p.userVotes || {};
-                        const userVotes = userVotesMap[user?.id || ''] || [];
-                        const hasVoted = userVotes.length > 0;
+                    activePolls.map(poll => {
+                        const isExpired = new Date() > new Date(poll.deadline);
+                        const hasVoted = poll.myOptionIds.length > 0;
                         const showResults = isExpired || hasVoted;
-                        const totalVotes = p.options.reduce((sum, opt) => sum + opt.votes, 0);
 
                         return (
-                            <View key={p.id} style={[s.card, { borderLeftColor: '#3B82F6' }]}>
+                            <View key={poll.id} style={[s.card, { borderLeftColor: '#3B82F6' }]}>
                                 <View style={s.row}>
-                                    <Text style={s.pollTitle}>{p.question}</Text>
+                                    <Text style={s.pollTitle}>{poll.question}</Text>
                                 </View>
                                 {isExpired ? (
-                                    <View style={s.expiredBanner}><Text style={s.expiredText}>⏱️ Esta encuesta ha finalizado.</Text></View>
+                                    <View style={s.expiredBanner}><Text style={s.expiredText}>Esta encuesta ha finalizado.</Text></View>
                                 ) : (
                                     <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-                                        <Text style={s.metaText}>Cierra: {p.deadline}</Text>
-                                        {p.allowMultiple && (
+                                        <Text style={s.metaText}>Cierra: {new Date(poll.deadline).toLocaleDateString('es-CL')}</Text>
+                                        {poll.allowMultiple && (
                                             <View style={s.multiBadge}>
-                                                <Text style={s.multiBadgeText}>Respuesta Múltiple</Text>
+                                                <Text style={s.multiBadgeText}>Respuesta múltiple</Text>
                                             </View>
                                         )}
                                     </View>
                                 )}
 
                                 <View style={s.pollOptions}>
-                                    {p.options.map(opt => {
-                                        const percentage = totalVotes > 0 ? Math.round((opt.votes / totalVotes) * 100) : 0;
-                                        const isMyVote = userVotes.includes(opt.id);
+                                    {poll.options.map(option => {
+                                        const percentage = poll.totalVotes > 0 ? Math.round((option.votes / poll.totalVotes) * 100) : 0;
+                                        const isMyVote = poll.myOptionIds.includes(option.id);
 
                                         return (
                                             <TouchableOpacity
-                                                key={opt.id}
+                                                key={option.id}
                                                 style={[
-                                                    s.pollOptionBtn, 
+                                                    s.pollOptionBtn,
                                                     isMyVote && s.pollOptionBtnSelected,
-                                                    showResults && isExpired && s.pollOptionBtnDisabled
+                                                    (isExpired || submittingVote === poll.id) && s.pollOptionBtnDisabled,
                                                 ]}
-                                                onPress={() => !isExpired && user?.id && votePoll(p.id, opt.id, user.id)}
-                                                disabled={isExpired}
+                                                onPress={() => !isExpired && handleVote(poll, option.id)}
+                                                disabled={isExpired || submittingVote === poll.id}
                                                 activeOpacity={isExpired ? 1 : 0.7}
                                             >
                                                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '100%', zIndex: 3 }}>
                                                     <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                                                        {p.allowMultiple ? (
+                                                        {poll.allowMultiple ? (
                                                             <View style={[s.checkbox, isMyVote && s.checkboxSelected]}>
                                                                 {isMyVote && <Text style={s.checkSymbol}>✓</Text>}
                                                             </View>
@@ -79,20 +112,18 @@ export default function PollsScreen() {
                                                                 {isMyVote && <View style={s.radioInner} />}
                                                             </View>
                                                         )}
-                                                        <Text style={[s.pollOptionText, isMyVote && s.pollOptionTextSelected]}>{opt.text}</Text>
+                                                        <Text style={[s.pollOptionText, isMyVote && s.pollOptionTextSelected]}>{option.text}</Text>
                                                     </View>
                                                     {showResults && <Text style={[s.pollOptionText, isMyVote && s.pollOptionTextSelected]}>{percentage}%</Text>}
                                                 </View>
-                                                {showResults && (
-                                                    <View style={[s.pollResultFillBg, { width: `${percentage}%` }]} />
-                                                )}
+                                                {showResults && <View style={[s.pollResultFillBg, { width: `${percentage}%` }]} />}
                                             </TouchableOpacity>
                                         );
                                     })}
                                 </View>
                                 <Text style={s.pollFooter}>
-                                    {totalVotes} {totalVotes === 1 ? 'voto' : 'votos'} en total
-                                    {p.allowMultiple && !isExpired && ' • Puedes elegir varias opciones'}
+                                    {poll.totalVotes} {poll.totalVotes === 1 ? 'voto' : 'votos'} en total
+                                    {poll.allowMultiple && !isExpired && ' • Puedes elegir varias opciones'}
                                 </Text>
                             </View>
                         );

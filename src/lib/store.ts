@@ -38,18 +38,6 @@ export type Favor = {
     replies?: FavorReply[];
 };
 
-export type SolicitudReply = {
-    id: string; message: string; from: 'admin' | 'user'; date: string;
-};
-
-export type Solicitud = {
-    id: string; title: string; description: string; category: string; user: string; userEmail: string; date: string;
-    status: 'Abierta' | 'En proceso' | 'Resuelta' | 'Rechazada';
-    hasImage: boolean; imageUri?: string; replies: SolicitudReply[];
-    seenByAdmin: boolean; seenByUser: boolean;
-    trackingNumber: string;
-};
-
 export type OrgSettings = {
     name: string; address: string; phone: string; social: string;
 };
@@ -68,10 +56,6 @@ export type MemberDue = {
     status: 'paid' | 'pending' | 'overdue' | 'PENDING_VALIDATION' | 'REJECTED';
     paidDate?: string; receiptUri?: string; rejectionReason?: string; adminComment?: string;
     voucherId?: string; // New field for Payment Voucher
-};
-
-export type FinanceEntry = {
-    id: string; type: 'income' | 'expense'; category: string; description: string; amount: number; date: string;
 };
 
 export type EventItem = {
@@ -97,10 +81,8 @@ export type MapPin = {
 
 type AppStore = {
     announcements: Announcement[];
-    solicitudes: Solicitud[];
     documents: Document[];
     members: Member[];
-    finances: FinanceEntry[];
     memberDues: MemberDue[];
     seenAvisosCount: number;
     seenDocsCount: number;
@@ -127,18 +109,8 @@ type AppStore = {
     updateFavor: (id: string, updates: Partial<Favor>) => void;
     removeFavor: (id: string) => void;
 
-    addSolicitud: (s: Omit<Solicitud, 'id' | 'date' | 'status' | 'replies' | 'seenByAdmin' | 'seenByUser' | 'trackingNumber'>) => void;
-    removeSolicitud: (id: string) => void;
-    updateSolicitudStatus: (id: string, status: Solicitud['status']) => void;
-    addSolicitudReply: (solicitudId: string, message: string, from: 'admin' | 'user') => void;
-    markSolicitudSeen: (id: string, by: 'admin' | 'user') => void;
-
     addDocument: (d: Omit<Document, 'id' | 'date'>) => void;
     removeDocument: (id: string) => void;
-
-    addFinanceEntry: (f: Omit<FinanceEntry, 'id'>) => void;
-    updateFinanceEntry: (id: string, updates: Partial<FinanceEntry>) => void;
-    removeFinanceEntry: (id: string) => void;
 
     updateMemberDue: (id: string, status: MemberDue['status'], paidDate?: string) => void;
     submitDueReceipt: (id: string, receiptUri: string) => void;
@@ -153,10 +125,11 @@ type AppStore = {
     setFavors: (favors: Favor[]) => void;
     setMapPins: (pins: MapPin[]) => void;
     setMembers: (members: Member[]) => void;
-    setSolicitudes: (solicitudes: Solicitud[]) => void;
     setAnnouncements: (announcements: Announcement[]) => void;
     setDocuments: (documents: Document[]) => void;
+    setMemberDues: (memberDues: MemberDue[]) => void;
     setEvents: (events: EventItem[]) => void;
+    resetState: () => void;
 };
 
 const MONTHS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
@@ -170,10 +143,8 @@ export const useAppStore = create<AppStore>()(
     persist(
         (set) => ({
             announcements: [],
-            solicitudes: [],
             documents: [],
             members: [],
-            finances: [],
             memberDues: [],
             seenAvisosCount: 0,
             seenDocsCount: 0,
@@ -255,35 +226,6 @@ export const useAppStore = create<AppStore>()(
             updateEvent: (id, updates) => set((state) => ({ events: state.events.map(ev => ev.id === id ? { ...ev, ...updates } : ev) })),
             removeEvent: (id) => set((state) => ({ events: state.events.filter(ev => ev.id !== id) })),
 
-            addSolicitud: (s) => set((state) => {
-                let trackingNumber = '';
-                let isUnique = false;
-                while (!isUnique) {
-                    trackingNumber = `SOL-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`;
-                    isUnique = !state.solicitudes.some(sol => sol.trackingNumber === trackingNumber);
-                }
-                return {
-                    solicitudes: [{ ...s, category: s.category || 'Otro', id: Date.now().toString(), date: now(), status: 'Abierta', replies: [], seenByAdmin: false, seenByUser: true, trackingNumber }, ...state.solicitudes],
-                };
-            }),
-            removeSolicitud: (id) => set((state) => ({
-                solicitudes: state.solicitudes.filter(s => s.id !== id),
-            })),
-            updateSolicitudStatus: (id, status) => set((state) => ({
-                solicitudes: state.solicitudes.map(s => s.id === id ? { ...s, status, seenByUser: false } : s),
-            })),
-            addSolicitudReply: (solicitudId, message, from) => set((state) => ({
-                solicitudes: state.solicitudes.map(s => s.id === solicitudId ? {
-                    ...s,
-                    replies: [...s.replies, { id: Date.now().toString(), message, from, date: now() }],
-                    seenByAdmin: from === 'admin',
-                    seenByUser: from === 'user',
-                } : s),
-            })),
-            markSolicitudSeen: (id, by) => set((state) => ({
-                solicitudes: state.solicitudes.map(s => s.id === id ? { ...s, [by === 'admin' ? 'seenByAdmin' : 'seenByUser']: true } : s),
-            })),
-
             addDocument: (d) => set((state) => {
                 const date = new Date();
                 const dateStr = `${date.getDate()} ${MONTHS[date.getMonth()]} ${date.getFullYear()}`;
@@ -293,16 +235,6 @@ export const useAppStore = create<AppStore>()(
             }),
             removeDocument: (id) => set((state) => ({
                 documents: state.documents.filter(d => d.id !== id),
-            })),
-
-            addFinanceEntry: (f) => set((state) => ({
-                finances: [{ ...f, id: Date.now().toString() }, ...state.finances],
-            })),
-            updateFinanceEntry: (id, updates) => set((state) => ({
-                finances: state.finances.map(f => f.id === id ? { ...f, ...updates } : f),
-            })),
-            removeFinanceEntry: (id) => set((state) => ({
-                finances: state.finances.filter(f => f.id !== id),
             })),
 
             updateMemberDue: (id: string, status: MemberDue['status'], paidDate?: string) => {
@@ -346,16 +278,53 @@ export const useAppStore = create<AppStore>()(
             setFavors: (favors) => set({ favors }),
             setMapPins: (pins) => set({ mapPins: pins }),
             setMembers: (members) => set({ members }),
-            setSolicitudes: (solicitudes) => set({ solicitudes }),
             setAnnouncements: (announcements) => set({ announcements }),
             setDocuments: (documents) => set({ documents }),
+            setMemberDues: (memberDues) => set({ memberDues }),
             setEvents: (events) => set({ events }),
+            resetState: () => set({
+                announcements: [],
+                documents: [],
+                members: [],
+                memberDues: [],
+                seenAvisosCount: 0,
+                seenDocsCount: 0,
+                polls: [],
+                favors: [],
+                events: [],
+                mapPins: [],
+                orgSettings: { name: 'JJVV Mi Barrio', address: '', phone: '', social: '' },
+            }),
         }),
         {
             name: 'jjvv-app-storage-v7',
             storage: createJSONStorage(() => AsyncStorage),
+            version: 9,
+            migrate: async (persistedState: any) => ({
+                ...persistedState,
+                solicitudes: [],
+                finances: [],
+            }),
+            partialize: (state) => ({
+                announcements: state.announcements,
+                documents: state.documents,
+                members: state.members,
+                memberDues: state.memberDues,
+                seenAvisosCount: state.seenAvisosCount,
+                seenDocsCount: state.seenDocsCount,
+                mapPins: state.mapPins,
+                orgSettings: state.orgSettings,
+                polls: state.polls,
+                favors: state.favors,
+                events: state.events,
+            }),
         }
     )
 );
 
 export const formatCLP = (amount: number) => `$${amount.toLocaleString('es-CL')}`;
+
+export const clearPersistedAppState = async () => {
+    useAppStore.getState().resetState();
+    await useAppStore.persist.clearStorage();
+};

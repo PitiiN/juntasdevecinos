@@ -6,12 +6,13 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useAppStore, MapPin } from '../../lib/store';
 import { useAuth } from '../../context/AuthContext';
 import { poiService } from '../../services/poiService';
+import { ticketService } from '../../services/ticketService';
 
 const SERVICE_SUBCATEGORIES = ['Salud', 'Deporte', 'Servicios para el hogar', 'Comida', 'Otro'];
 
 export default function NeighborhoodMapScreen({ navigation }: any) {
     const { isAdmin, viewMode, user, organizationId } = useAuth();
-    const { mapPins, setMapPins, addMapPin, removeMapPin, updateMapPin, addMapPinReview, addSolicitud } = useAppStore();
+    const { mapPins, setMapPins, addMapPin, removeMapPin, updateMapPin, addMapPinReview } = useAppStore();
     const mapRef = useRef<MapView>(null);
     const [isLoading, setIsLoading] = useState(false);
 
@@ -165,15 +166,26 @@ export default function NeighborhoodMapScreen({ navigation }: any) {
                 setIsLoading(false);
             }
         } else {
-            addSolicitud({
-                title: `📍 Pin: ${pinTitle.trim()}`,
-                description: `Solicitud de nuevo pin.\n\nNombre: ${pinTitle.trim()}\nEmoji: ${pinEmoji}\nDescripción: ${pinDesc.trim() || 'Sin descripción'}\nTipo: ${pinCategory === 'servicio' ? 'Servicio' : 'Punto de Interés'}${pinCategory === 'servicio' ? `\nCategoría: ${pinSubcategory}\nWhatsApp: ${pinWhatsapp || 'N/A'}\nInstagram: ${pinInstagram || 'N/A'}\nFacebook: ${pinFacebook || 'N/A'}` : ''}\nUbicación: ${tappedLat.toFixed(6)}, ${tappedLng.toFixed(6)}`,
-                category: 'Nuevo Servicio/Oficio/Emprendimiento',
-                user: user?.user_metadata?.full_name || 'Vecino',
-                userEmail: user?.email || '',
-                hasImage: false,
-            });
-            Alert.alert('📨 Solicitud enviada', 'Tu solicitud de Pin ha sido enviada al administrador.');
+            if (!organizationId) {
+                Alert.alert('Error', 'No se pudo identificar la organizacion.');
+                return;
+            }
+
+            try {
+                setIsLoading(true);
+                await ticketService.createTicket({
+                    organizationId,
+                    title: `PIN: ${pinTitle.trim()}`,
+                    description: `Solicitud de nuevo pin.\n\nNombre: ${pinTitle.trim()}\nEmoji: ${pinEmoji}\nDescripcion: ${pinDesc.trim() || 'Sin descripcion'}\nTipo: ${pinCategory === 'servicio' ? 'Servicio' : 'Punto de Interes'}${pinCategory === 'servicio' ? `\nCategoria: ${pinSubcategory}\nWhatsApp: ${pinWhatsapp || 'N/A'}\nInstagram: ${pinInstagram || 'N/A'}\nFacebook: ${pinFacebook || 'N/A'}` : ''}\nUbicacion: ${tappedLat.toFixed(6)}, ${tappedLng.toFixed(6)}`,
+                    category: 'Nuevo Servicio/Oficio/Emprendimiento',
+                });
+                Alert.alert('Solicitud enviada', 'Tu solicitud de pin fue enviada a la administracion.');
+            } catch (error) {
+                console.error('Error creating pin request:', error);
+                Alert.alert('Error', 'No se pudo enviar la solicitud al servidor.');
+            } finally {
+                setIsLoading(false);
+            }
         }
         resetPinForm();
     };
@@ -511,3 +523,4 @@ const s = StyleSheet.create({
     pinDelete: { fontSize: 20 },
     emptyPins: { padding: 30, textAlign: 'center', color: '#94A3B8', fontSize: 15, fontStyle: 'italic' },
 });
+
