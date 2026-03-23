@@ -29,7 +29,7 @@
       },
       "package": "com.jjvv.mobile",
       "versionCode": 3,
-      "googleServicesFile": "./credentials/android/google-services.json",
+      "googleServicesFile": "./google-services.json",
       "config": {
         "googleMapsApiKey": "AIzaSyCWyXWAj4jhMkCr2V8K0wBGwGrnhTajulY"
       }

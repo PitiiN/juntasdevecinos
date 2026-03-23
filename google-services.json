@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "280627363771",
+    "project_id": "jjvv-mobile",
+    "storage_bucket": "jjvv-mobile.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:280627363771:android:3a8b91df834f293f298e9e",
+        "android_client_info": {
+          "package_name": "com.jjvv.mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC8yIEnDW-OaLA9kG2ti0cKQZ_8xOU4duI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
