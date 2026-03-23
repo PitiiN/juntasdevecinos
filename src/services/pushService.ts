@@ -69,9 +69,20 @@ export const pushService = {
         }
 
         const Notifications = require('expo-notifications');
-        const token = (await Notifications.getExpoPushTokenAsync({
-            projectId,
-        })).data;
+        let token: string;
+        try {
+            token = (await Notifications.getExpoPushTokenAsync({
+                projectId,
+            })).data;
+        } catch (error: any) {
+            const message = String(error?.message || '');
+            if (Platform.OS === 'android' && message.includes('Default FirebaseApp is not initialized')) {
+                throw new Error(
+                    'Firebase/FCM no esta inicializado en esta build Android. Agrega credentials/android/google-services.json, recompila y vuelve a probar.',
+                );
+            }
+            throw error;
+        }
 
         const { error } = await supabase
             .from('push_tokens')

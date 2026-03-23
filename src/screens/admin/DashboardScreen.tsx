@@ -13,16 +13,19 @@ export default function DashboardScreen() {
     const { openCount: openSolicitudes } = useTicketCounters(organizationId);
 
     const stats = [
-        { label: 'Socios', value: members.length.toString(), icon: '👥', color: '#FFF7ED', tab: 'Admin', screen: 'ManageMembers' },
         { label: 'Avisos', value: announcements.length.toString(), icon: '📢', color: '#F1F5F9', tab: 'Avisos' },
-        { label: 'Solicitudes', value: openSolicitudes.toString(), icon: '📝', color: '#FFF7ED', tab: 'Solicitudes' },
-        { label: 'Documentos', value: documents.length.toString(), icon: '📁', color: '#F1F5F9', tab: 'Docs' },
-        { label: 'Finanzas', value: '💸', icon: '💸', color: '#FFF7ED', tab: 'Admin', screen: 'AdminFinance' },
-        { label: 'Favores', value: '🤝', icon: '🤝', color: '#F1F5F9', tab: 'Admin', screen: 'Favores' },
+        { label: 'Encuestas', value: '📊', icon: '📊', color: '#FFF7ED', tab: 'Admin', screen: 'Polls' },
         { label: 'Agenda', value: '📅', icon: '📅', color: '#FFF7ED', tab: 'Admin', screen: 'Agenda' },
+        { label: 'Solicitudes', value: openSolicitudes.toString(), icon: '📝', color: '#F1F5F9', tab: 'Solicitudes' },
+        { label: 'Favores', value: '🤝', icon: '🤝', color: '#FFF7ED', tab: 'Admin', screen: 'Favores' },
         { label: 'Mapa', value: '🗺️', icon: '🗺️', color: '#F1F5F9', tab: 'Admin', screen: 'MapaAdmin' },
+        { label: 'S.O.S', value: '🆘', icon: '🆘', color: '#FFF7ED', tab: 'Admin', screen: 'Emergency' },
+        { label: 'Documentos', value: documents.length.toString(), icon: '📁', color: '#F1F5F9', tab: 'Docs' },
         { label: 'Directiva', value: '🏢', icon: '🏢', color: '#FFF7ED', tab: 'Admin', screen: 'Directiva' },
-        { label: 'Config', value: '⚙️', icon: '⚙️', color: '#F1F5F9', tab: 'Admin', screen: 'AdminSettings' },
+        { label: 'Accesibilidad', value: '♿', icon: '♿', color: '#F1F5F9', tab: 'Admin', screen: 'Accessibility' },
+        { label: 'Socios', value: members.length.toString(), icon: '👥', color: '#FFF7ED', tab: 'Admin', screen: 'ManageMembers' },
+        { label: 'Finanzas', value: '💸', icon: '💸', color: '#F1F5F9', tab: 'Admin', screen: 'AdminFinance' },
+        { label: 'Config', value: '⚙️', icon: '⚙️', color: '#FFF7ED', tab: 'Admin', screen: 'AdminSettings' },
     ];
 
     const handlePress = (stat: typeof stats[0]) => {

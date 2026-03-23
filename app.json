@@ -28,6 +28,7 @@
         "backgroundColor": "#1E3A5F"
       },
       "package": "com.jjvv.mobile",
+      "googleServicesFile": "./credentials/android/google-services.json",
       "config": {
         "googleMapsApiKey": "AIzaSyCWyXWAj4jhMkCr2V8K0wBGwGrnhTajulY"
       }

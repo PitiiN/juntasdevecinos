@@ -26,10 +26,30 @@ export const CommonMap: React.FC<CommonMapProps> = ({
   mapRef,
 }) => {
   const [showDisclosure, setShowDisclosure] = useState(false);
+  const [shouldTrackMarkerViewChanges, setShouldTrackMarkerViewChanges] = useState(true);
 
   useEffect(() => {
     checkDisclosure();
   }, []);
+
+  useEffect(() => {
+    if (Platform.OS !== 'android') {
+      setShouldTrackMarkerViewChanges(false);
+      return;
+    }
+
+    if (pins.length === 0) {
+      setShouldTrackMarkerViewChanges(false);
+      return;
+    }
+
+    setShouldTrackMarkerViewChanges(true);
+    const timer = setTimeout(() => {
+      setShouldTrackMarkerViewChanges(false);
+    }, 650);
+
+    return () => clearTimeout(timer);
+  }, [pins]);
 
   const checkDisclosure = async () => {
     try {
@@ -66,9 +86,16 @@ export const CommonMap: React.FC<CommonMapProps> = ({
         style={styles.map}
         initialRegion={defaultRegion}
         onPress={(e) => {
-          if (onMapPress) {
-            onMapPress(e.nativeEvent.coordinate.latitude, e.nativeEvent.coordinate.longitude);
-          }
+          if (!onMapPress) return;
+          const action = e?.nativeEvent?.action;
+          const coordinate = e?.nativeEvent?.coordinate;
+          if (action === 'marker-press' || !coordinate) return;
+
+          const latitude = coordinate.latitude;
+          const longitude = coordinate.longitude;
+          if (typeof latitude !== 'number' || typeof longitude !== 'number') return;
+
+          onMapPress(latitude, longitude);
         }}
       >
         {pins.map((pin, index) => (
@@ -76,6 +103,7 @@ export const CommonMap: React.FC<CommonMapProps> = ({
             key={pin.id || `pin-${index}`}
             coordinate={{ latitude: pin.lat, longitude: pin.lng }}
             onPress={() => onMarkerPress && onMarkerPress(pin)}
+            tracksViewChanges={shouldTrackMarkerViewChanges}
           >
             <View style={styles.markerContainer}>
               <Text style={styles.markerEmoji}>{pin.emoji || '📍'}</Text>

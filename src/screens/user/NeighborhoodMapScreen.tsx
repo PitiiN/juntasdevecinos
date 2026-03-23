@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, Modal, ScrollView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import MapView, { Marker } from 'react-native-maps';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAppStore, MapPin } from '../../lib/store';
 import { useAuth } from '../../context/AuthContext';
@@ -48,7 +48,9 @@ export default function NeighborhoodMapScreen({ navigation }: any) {
     const { mapPins, setMapPins, addMapPin, removeMapPin, updateMapPin, addMapPinReview } = useAppStore();
     const mapRef = useRef<MapView>(null);
     const ignoreNextMapPressRef = useRef(false);
+    const [isMapReady, setIsMapReady] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [shouldTrackMarkerViewChanges, setShouldTrackMarkerViewChanges] = useState(true);
 
     // Modals
     const [showAddModal, setShowAddModal] = useState(false);
@@ -75,7 +77,7 @@ export default function NeighborhoodMapScreen({ navigation }: any) {
     const [tappedLng, setTappedLng] = useState<number | null>(null);
     const [editingPinId, setEditingPinId] = useState<string | null>(null);
 
-    const loadPins = async () => {
+    const loadPins = useCallback(async () => {
         if (!organizationId) return;
         setIsLoading(true);
         try {
@@ -110,23 +112,58 @@ export default function NeighborhoodMapScreen({ navigation }: any) {
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [organizationId, setMapPins]);
 
     React.useEffect(() => {
-        loadPins();
-    }, [organizationId]);
+        void loadPins();
+    }, [loadPins]);
+
+    React.useEffect(() => {
+        if (Platform.OS !== 'android') {
+            setShouldTrackMarkerViewChanges(false);
+            return;
+        }
+
+        if (mapPins.length === 0) {
+            setShouldTrackMarkerViewChanges(false);
+            return;
+        }
+
+        setShouldTrackMarkerViewChanges(true);
+        const timer = setTimeout(() => {
+            setShouldTrackMarkerViewChanges(false);
+        }, 650);
+
+        return () => clearTimeout(timer);
+    }, [mapPins]);
 
     useFocusEffect(
         useCallback(() => {
-            if (mapRef.current) {
-                mapRef.current.animateToRegion({
-                    latitude: -33.48942,
-                    longitude: -70.6567,
-                    latitudeDelta: 0.005,
-                    longitudeDelta: 0.005,
-                }, 1000);
+            void loadPins();
+        }, [loadPins]),
+    );
+
+    useFocusEffect(
+        useCallback(() => {
+            if (!isMapReady || !mapRef.current) {
+                return;
             }
-        }, [])
+
+            const timer = setTimeout(() => {
+                try {
+                    mapRef.current?.animateToRegion({
+                        latitude: -33.48942,
+                        longitude: -70.6567,
+                        latitudeDelta: 0.005,
+                        longitudeDelta: 0.005,
+                    }, 1000);
+                } catch (error) {
+                    console.warn('Map animation skipped:', error);
+                }
+            }, 80);
+
+            return () => clearTimeout(timer);
+        }, [isMapReady])
     );
 
     const isActualAdmin = isAdmin && viewMode === 'admin';
@@ -339,6 +376,7 @@ export default function NeighborhoodMapScreen({ navigation }: any) {
             <View style={s.mapContainer}>
                 <MapView
                     ref={mapRef}
+                    provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
                     style={s.map}
                     initialRegion={{
                         latitude: -33.48942,
@@ -346,6 +384,7 @@ export default function NeighborhoodMapScreen({ navigation }: any) {
                         latitudeDelta: 0.005,
                         longitudeDelta: 0.005,
                     }}
+                    onMapReady={() => setIsMapReady(true)}
                     onLongPress={handleMapPress}
                 >
                     {mapPins.map(p => (
@@ -354,8 +393,8 @@ export default function NeighborhoodMapScreen({ navigation }: any) {
                             coordinate={{ latitude: p.lat, longitude: p.lng }}
                             onPress={() => handleMarkerPress(p)}
                             anchor={{ x: 0.5, y: 0.5 }}
-                            tracksViewChanges
-                            // Keep marker tracking enabled so custom pin icons render reliably on Android.
+                            tracksViewChanges={shouldTrackMarkerViewChanges}
+                            // Enable tracking briefly after pin updates so emoji renders on Android, then disable.
                         >
                             <View style={s.markerContainer}>
                                 <Text style={s.markerEmoji} allowFontScaling={false}>{getVisiblePinEmoji(p.emoji)}</Text>

@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
     View,
     Text,
@@ -26,6 +26,7 @@ export default function SolicitudDetailScreen({ route, navigation }: any) {
     const [reply, setReply] = useState('');
     const [loading, setLoading] = useState(true);
     const [sending, setSending] = useState(false);
+    const scrollRef = useRef<ScrollView>(null);
     const isAdminContext = requestedAdmin && isAdmin && viewMode === 'admin';
 
     const loadTicket = useCallback(async () => {
@@ -113,27 +114,52 @@ export default function SolicitudDetailScreen({ route, navigation }: any) {
     };
 
     const approveMapPin = async () => {
-        const titleMatch = ticket.description.match(/Nombre: (.*)/);
-        const descMatch = ticket.description.match(/Descripción: (.*)/);
-        const typeMatch = ticket.description.match(/Tipo: (.*)/);
-        const locMatch = ticket.description.match(/Ubicación: (.*), (.*)/);
-        const emojiMatch = ticket.description.match(/Emoji: (.*)/);
+        const lines = ticket.description
+            .split('\n')
+            .map((line) => line.trim())
+            .filter(Boolean);
 
-        const title = titleMatch ? titleMatch[1] : ticket.title.replace('PIN: ', '').replace('📍 Pin: ', '');
-        const description = descMatch ? descMatch[1] : '';
-        const category = typeMatch && typeMatch[1].includes('Punto de Interés') ? 'punto_interes' : 'servicio';
-        const emoji = emojiMatch ? emojiMatch[1] : '📍';
+        const normalize = (value: string) =>
+            value
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .toLowerCase();
+
+        const extractValue = (needle: string) => {
+            const line = lines.find((item) => normalize(item).includes(needle) && item.includes(':'));
+            if (!line) return '';
+            return line.slice(line.indexOf(':') + 1).trim();
+        };
+
+        const titleFromBody = extractValue('nombre');
+        const descriptionFromBody = extractValue('descripci');
+        const typeFromBody = extractValue('tipo');
+        const emojiFromBody = extractValue('emoji');
+        const locationFromBody = extractValue('ubicaci');
+
+        const title = titleFromBody || ticket.title.replace('PIN: ', '').replace('\u{1F4CD} Pin: ', '');
+        const description = descriptionFromBody || title;
+        const category = normalize(typeFromBody).includes('punto') ? 'punto_interes' : 'servicio';
+        const emoji = emojiFromBody || '\u{1F4CD}';
         let lat = -33.48942;
         let lng = -70.6567;
 
-        if (locMatch && locMatch.length >= 3) {
-            lat = parseFloat(locMatch[1]);
-            lng = parseFloat(locMatch[2]);
+        const coordinateMatch =
+            locationFromBody.match(/(-?\d{1,2}(?:\.\d+)?)\s*,\s*(-?\d{1,3}(?:\.\d+)?)/) ||
+            ticket.description.match(/(-?\d{1,2}(?:\.\d+)?)\s*,\s*(-?\d{1,3}(?:\.\d+)?)/);
+
+        if (coordinateMatch && coordinateMatch.length >= 3) {
+            const parsedLat = parseFloat(coordinateMatch[1]);
+            const parsedLng = parseFloat(coordinateMatch[2]);
+            if (Number.isFinite(parsedLat) && Number.isFinite(parsedLng)) {
+                lat = parsedLat;
+                lng = parsedLng;
+            }
         }
 
         try {
             if (!organizationId) {
-                throw new Error('No se pudo identificar la organización.');
+                throw new Error('No se pudo identificar la organizacion.');
             }
 
             await poiService.createPoi({
@@ -143,13 +169,19 @@ export default function SolicitudDetailScreen({ route, navigation }: any) {
                 category,
                 latitude: lat,
                 longitude: lng,
+                location: {
+                    latitude: lat,
+                    longitude: lng,
+                    lat,
+                    lng,
+                },
                 emoji,
                 created_by: user?.id,
             });
 
             await ticketService.setTicketStatus(ticket.id, 'resolved');
             await loadTicket();
-            Alert.alert('Pin aprobado', `El pin "${title}" fue agregado al mapa y la solicitud quedó resuelta.`);
+            Alert.alert('Pin aprobado', 'El pin "' + title + '" fue agregado al mapa y la solicitud quedo resuelta.');
         } catch (error: any) {
             Alert.alert('Error', error.message || 'No se pudo guardar el pin en el servidor.');
         }
@@ -183,14 +215,21 @@ export default function SolicitudDetailScreen({ route, navigation }: any) {
 
     const isClosed = ticket.rawStatus === 'resolved' || ticket.rawStatus === 'rejected';
 
+    const handleReplyFocus = () => {
+        setTimeout(() => {
+            scrollRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+    };
+
     return (
         <SafeAreaView style={s.safe}>
             <KeyboardAvoidingView
                 style={s.safe}
-                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-                keyboardVerticalOffset={8}
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 24}
             >
                 <ScrollView
+                    ref={scrollRef}
                     contentContainerStyle={s.scroll}
                     keyboardShouldPersistTaps="handled"
                     keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
@@ -270,6 +309,7 @@ export default function SolicitudDetailScreen({ route, navigation }: any) {
                                 placeholderTextColor="#94A3B8"
                                 value={reply}
                                 onChangeText={setReply}
+                                onFocus={handleReplyFocus}
                                 multiline
                             />
                             <TouchableOpacity style={s.sendBtn} onPress={() => void handleSendReply()} disabled={sending}>
@@ -300,7 +340,7 @@ const getStatusColor = (status: TicketItem['status']) => {
 
 const s = StyleSheet.create({
     safe: { flex: 1, backgroundColor: 'transparent' },
-    scroll: { padding: 20 },
+    scroll: { padding: 20, paddingBottom: 28 },
     back: { marginBottom: 16 },
     backText: { color: '#2563EB', fontSize: 16, fontWeight: '600' },
     header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
@@ -325,7 +365,7 @@ const s = StyleSheet.create({
     replyFrom: { fontSize: 12, fontWeight: 'bold', color: '#64748B', marginBottom: 4 },
     replyMsg: { fontSize: 14, color: '#0F172A', lineHeight: 20 },
     replyDate: { fontSize: 11, color: '#94A3B8', marginTop: 4, textAlign: 'right' },
-    replyBox: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, marginTop: 8, marginBottom: 40 },
+    replyBox: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, marginTop: 8, marginBottom: 16 },
     replyInput: {
         flex: 1,
         backgroundColor: '#FFFFFF',
@@ -346,7 +386,7 @@ const s = StyleSheet.create({
         borderRadius: 12,
         padding: 16,
         marginTop: 8,
-        marginBottom: 40,
+        marginBottom: 16,
         alignItems: 'center',
         borderWidth: 1,
         borderColor: '#E2E8F0',
