@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
-import { ActivityIndicator, View, Text } from 'react-native';
+import { ActivityIndicator, View, Text, Image } from 'react-native';
 import * as Linking from 'expo-linking';
 import { useAuth } from '../context/AuthContext';
 import { useAccessibility } from '../context/AccessibilityContext';
@@ -11,6 +11,7 @@ import AdminTabs from './AdminTabs';
 import PendingApprovalScreen from '../screens/auth/PendingApprovalScreen';
 
 const prefix = Linking.createURL('/');
+const APP_LOGO = require('../../assets/logoJJVV.png');
 
 export default function RootNavigator() {
     const { session, isLoading, isAdmin, isSuperadmin, viewMode, hasApprovedAccess } = useAuth();
@@ -44,8 +45,13 @@ export default function RootNavigator() {
     if (!isReady || isLoading) {
         return (
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#1E3A5F' }}>
+                <Image
+                    source={APP_LOGO}
+                    style={{ width: 240, height: 240, marginBottom: 16 }}
+                    resizeMode="contain"
+                />
                 <ActivityIndicator size="large" color="#ffffff" />
-                <Text style={{ marginTop: 20, color: '#ffffff', fontSize: 18 }}>Cargando JJVV...</Text>
+                <Text style={{ marginTop: 18, color: '#ffffff', fontSize: 18 }}>Cargando JJVV...</Text>
             </View>
         );
     }

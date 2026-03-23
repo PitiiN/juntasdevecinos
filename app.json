@@ -4,32 +4,43 @@
     "slug": "jjvv-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/logoJJVV.png",
     "userInterfaceStyle": "light",
     "scheme": "jjvv",
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/logoJJVV.png",
       "resizeMode": "contain",
       "backgroundColor": "#1E3A5F"
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.jjvv.mobile"
+      "bundleIdentifier": "com.jjvv.mobile",
+      "config": {
+        "googleMapsApiKey": "AIzaSyCWyXWAj4jhMkCr2V8K0wBGwGrnhTajulY"
+      },
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/logoJJVV.png",
         "backgroundColor": "#1E3A5F"
       },
-      "package": "com.jjvv.mobile"
+      "package": "com.jjvv.mobile",
+      "config": {
+        "googleMapsApiKey": "AIzaSyCWyXWAj4jhMkCr2V8K0wBGwGrnhTajulY"
+      }
     },
     "plugins": [
       [
         "expo-notifications",
         {
-          "defaultChannel": "default"
+          "defaultChannel": "default",
+          "icon": "./assets/logoJJVV.png"
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "extra": {
       "eas": {

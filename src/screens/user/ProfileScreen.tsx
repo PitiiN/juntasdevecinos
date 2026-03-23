@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, TextInput, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
@@ -9,7 +9,7 @@ export default function ProfileScreen({ navigation }: any) {
     const fullName = user?.user_metadata?.full_name || 'Vecino';
     const email = user?.email || '';
     const createdAt = user?.created_at ? new Date(user.created_at).toLocaleDateString('es-CL') : '';
-    const organizationLabel = organizationName || pendingMembershipRequest?.organizationName || 'Sin organizacion aprobada';
+    const organizationLabel = organizationName || pendingMembershipRequest?.organizationName || 'Sin organización aprobada';
 
     const [showPasswordModal, setShowPasswordModal] = useState(false);
     const [newPassword, setNewPassword] = useState('');
@@ -20,6 +20,10 @@ export default function ProfileScreen({ navigation }: any) {
     const [address, setAddress] = useState('');
     const [addressLoading, setAddressLoading] = useState(false);
 
+    const [showPhoneModal, setShowPhoneModal] = useState(false);
+    const [phone, setPhone] = useState('');
+    const [phoneLoading, setPhoneLoading] = useState(false);
+
     useEffect(() => {
         void fetchProfile();
     }, [user]);
@@ -29,12 +33,13 @@ export default function ProfileScreen({ navigation }: any) {
         try {
             const { data, error } = await supabase
                 .from('profiles')
-                .select('address')
+                .select('address, phone')
                 .eq('user_id', user.id)
                 .single();
 
             if (data) {
                 setAddress(data.address || '');
+                setPhone(data.phone || '');
             }
 
             if (error && error.code !== 'PGRST116') {
@@ -64,6 +69,28 @@ export default function ProfileScreen({ navigation }: any) {
             Alert.alert('Error', error.message || 'Error inesperado');
         } finally {
             setAddressLoading(false);
+        }
+    };
+
+    const handleSavePhone = async () => {
+        if (!user) return;
+        setPhoneLoading(true);
+        try {
+            const { error } = await supabase
+                .from('profiles')
+                .update({ phone: phone.trim() })
+                .eq('user_id', user.id);
+
+            if (error) {
+                Alert.alert('Error', error.message);
+            } else {
+                Alert.alert('Contacto actualizado', 'Tu numero de contacto fue guardado correctamente.');
+                setShowPhoneModal(false);
+            }
+        } catch (error: any) {
+            Alert.alert('Error', error.message || 'Error inesperado');
+        } finally {
+            setPhoneLoading(false);
         }
     };
 
@@ -126,13 +153,23 @@ export default function ProfileScreen({ navigation }: any) {
                     </View>
                 </TouchableOpacity>
 
+                <TouchableOpacity style={s.card} onPress={() => setShowPhoneModal(true)}>
+                    <View style={s.inlineRow}>
+                        <View style={{ flex: 1 }}>
+                            <Text style={s.label}>Número de Contacto</Text>
+                            <Text style={s.value}>{phone || 'No especificado (toca para editar)'}</Text>
+                        </View>
+                        <Text style={s.editIcon}>Editar</Text>
+                    </View>
+                </TouchableOpacity>
+
                 <View style={s.card}>
                     <Text style={s.label}>Miembro desde</Text>
                     <Text style={s.value}>{createdAt}</Text>
                 </View>
 
                 <View style={s.card}>
-                    <Text style={s.label}>Organizacion</Text>
+                    <Text style={s.label}>Organización</Text>
                     <Text style={s.value}>{organizationLabel}</Text>
                 </View>
 
@@ -156,6 +193,29 @@ export default function ProfileScreen({ navigation }: any) {
                                 <Text style={s.confirmText}>{addressLoading ? 'Guardando...' : 'Guardar direccion'}</Text>
                             </TouchableOpacity>
                             <TouchableOpacity onPress={() => setShowAddressModal(false)} style={s.cancelBtn}>
+                                <Text style={s.cancelText}>Cancelar</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </TouchableOpacity>
+                </Modal>
+
+                <Modal visible={showPhoneModal} transparent animationType="fade">
+                    <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => setShowPhoneModal(false)}>
+                        <View style={s.modalContent} onStartShouldSetResponder={() => true}>
+                            <Text style={s.modalTitle}>Editar contacto</Text>
+                            <Text style={s.modalSub}>Ingresa tu número de teléfono</Text>
+                            <TextInput
+                                style={s.input}
+                                placeholder="Ej: +56 9 1234 5678"
+                                placeholderTextColor="#94A3B8"
+                                value={phone}
+                                onChangeText={setPhone}
+                                keyboardType="phone-pad"
+                            />
+                            <TouchableOpacity style={[s.confirmBtn, phoneLoading && { opacity: 0.6 }]} onPress={handleSavePhone} disabled={phoneLoading}>
+                                <Text style={s.confirmText}>{phoneLoading ? 'Guardando...' : 'Guardar contacto'}</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => setShowPhoneModal(false)} style={s.cancelBtn}>
                                 <Text style={s.cancelText}>Cancelar</Text>
                             </TouchableOpacity>
                         </View>
@@ -223,3 +283,6 @@ const s = StyleSheet.create({
     cancelBtn: { marginTop: 12, alignItems: 'center' },
     cancelText: { color: '#94A3B8', fontSize: 14 },
 });
+
+
+

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
     KeyboardAvoidingView,
@@ -40,7 +40,7 @@ export default function RegisterScreen({ navigation }: any) {
             const data = await accessRequestService.listJoinableOrganizations();
             setOrganizations(data);
         } catch (error: any) {
-            Alert.alert('No se pudo cargar la lista de JJVV', error?.message || 'Intentalo nuevamente.');
+            Alert.alert('No se pudo cargar la lista de JJVV', error?.message || 'Inténtalo nuevamente.');
         } finally {
             setLoadingOrganizations(false);
         }
@@ -48,7 +48,7 @@ export default function RegisterScreen({ navigation }: any) {
 
     const handleRegister = async () => {
         if (!fullName || !email || !password || !selectedOrganizationId) {
-            Alert.alert('Error', 'Completa todos los campos y elige la organizacion a la que deseas unirte.');
+            Alert.alert('Error', 'Completa todos los campos y elige la organización a la que deseas unirte.');
             return;
         }
 
@@ -70,13 +70,13 @@ export default function RegisterScreen({ navigation }: any) {
             return;
         }
 
-        const organizationName = selectedOrganization?.name || 'la organizacion seleccionada';
+        const organizationName = selectedOrganization?.name || 'la organización seleccionada';
         const hasSession = Boolean(data.session);
         Alert.alert(
             'Solicitud enviada',
             hasSession
-                ? `Tu cuenta fue creada y tu solicitud para unirte a ${organizationName} quedo pendiente de aprobacion. Hasta que la aprueben no tendras acceso a la app.`
-                : `Tu cuenta fue creada y tu solicitud para unirte a ${organizationName} quedo pendiente de aprobacion. Si tu proyecto usa confirmacion por correo, revisa tu bandeja antes de iniciar sesion.`,
+                ? `Tu cuenta fue creada y tu solicitud para unirte a ${organizationName} quedó pendiente de aprobación. Hasta que la aprueben no tendrás acceso a la app.`
+                : `Tu cuenta fue creada y tu solicitud para unirte a ${organizationName} quedó pendiente de aprobación. Si tu proyecto usa confirmacion por correo, revisa tu bandeja antes de iniciar sesión.`,
             [
                 {
                     text: 'OK',
@@ -133,7 +133,7 @@ export default function RegisterScreen({ navigation }: any) {
                     <TouchableOpacity style={s.selector} onPress={() => setShowOrganizationModal(true)}>
                         <View style={{ flex: 1 }}>
                             <Text style={selectedOrganization ? s.selectorValue : s.selectorPlaceholder}>
-                                {selectedOrganization?.name || (loadingOrganizations ? 'Cargando organizaciones...' : 'Seleccionar organizacion')}
+                                {selectedOrganization?.name || (loadingOrganizations ? 'Cargando organizaciónes...' : 'Seleccionar organización')}
                             </Text>
                             {selectedOrganization && (
                                 <Text style={s.selectorMeta}>
@@ -141,7 +141,7 @@ export default function RegisterScreen({ navigation }: any) {
                                 </Text>
                             )}
                         </View>
-                        <Text style={s.selectorArrow}>›</Text>
+                        <Text style={s.selectorArrow}></Text>
                     </TouchableOpacity>
 
                     <Text style={s.helperText}>
@@ -153,7 +153,7 @@ export default function RegisterScreen({ navigation }: any) {
                     </TouchableOpacity>
 
                     <TouchableOpacity onPress={() => navigation.navigate('Login')} style={s.link}>
-                        <Text style={s.linkText}>¿Ya tienes cuenta? <Text style={s.linkBold}>Inicia sesion</Text></Text>
+                        <Text style={s.linkText}>¿Ya tienes cuenta? <Text style={s.linkBold}>Inicia sesión</Text></Text>
                     </TouchableOpacity>
                 </View>
             </ScrollView>
@@ -163,7 +163,7 @@ export default function RegisterScreen({ navigation }: any) {
                     <View style={s.modalCard} onStartShouldSetResponder={() => true}>
                         <Text style={s.modalTitle}>Selecciona tu JJVV</Text>
                         <Text style={s.modalSubtitle}>
-                            La solicitud llegara al inbox de administradores de esa organizacion.
+                            La solicitud llegara al inbox de administradores de esa organización.
                         </Text>
 
                         {loadingOrganizations ? (
@@ -289,3 +289,7 @@ const s = StyleSheet.create({
     cancelBtn: { alignItems: 'center', paddingTop: 6 },
     cancelText: { color: '#64748B', fontSize: 14, fontWeight: '600' },
 });
+
+
+
+

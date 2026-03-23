@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { Database } from '../types/database';
+import * as FileSystem from 'expo-file-system/legacy';
 
 type TicketStatus = Database['public']['Enums']['ticket_status_t'];
 type TicketViewer = 'user' | 'admin';
@@ -94,6 +95,46 @@ const sanitizeFileName = (value: string) =>
         .replace(/^-|-$/g, '')
         .toLowerCase();
 
+const getFileExtension = (fileName: string) => {
+    const parts = fileName.split('.');
+    if (parts.length < 2) {
+        return '';
+    }
+    const ext = parts[parts.length - 1].trim().toLowerCase();
+    if (!ext) {
+        return '';
+    }
+    return `.${ext.replace(/[^a-z0-9]/g, '')}`;
+};
+
+const ensureReadableUploadUri = async (fileUri: string, fileName: string) => {
+    if (!fileUri.startsWith('content://') || !FileSystem.cacheDirectory) {
+        return {
+            readableUri: fileUri,
+            cleanup: async () => { },
+        };
+    }
+
+    const extension = getFileExtension(fileName);
+    const tempUri = `${FileSystem.cacheDirectory}ticket-attachment-${Date.now()}${extension}`;
+
+    await FileSystem.copyAsync({
+        from: fileUri,
+        to: tempUri,
+    });
+
+    return {
+        readableUri: tempUri,
+        cleanup: async () => {
+            try {
+                await FileSystem.deleteAsync(tempUri, { idempotent: true });
+            } catch {
+                // Best effort cleanup.
+            }
+        },
+    };
+};
+
 const formatDateLabel = (value: string) =>
     new Date(value).toLocaleDateString('es-CL', {
         day: '2-digit',
@@ -164,21 +205,36 @@ const uploadAttachment = async (params: {
 }) => {
     const safeFileName = sanitizeFileName(params.fileName || `ticket-${Date.now()}.jpg`);
     const filePath = `${params.organizationId}/${params.userId}/${Date.now()}-${safeFileName}`;
-    const response = await fetch(params.fileUri);
-    const arrayBuffer = await response.arrayBuffer();
+    const { readableUri, cleanup } = await ensureReadableUploadUri(params.fileUri, safeFileName);
 
-    const { error } = await supabase.storage
-        .from(TICKET_ATTACHMENTS_BUCKET)
-        .upload(filePath, arrayBuffer, {
-            contentType: params.mimeType || undefined,
-            upsert: false,
-        });
+    try {
+        const response = await fetch(readableUri);
+        if (!response.ok) {
+            throw new Error('No se pudo leer el archivo adjunto.');
+        }
+        const arrayBuffer = await response.arrayBuffer();
 
-    if (error) {
+        const { error } = await supabase.storage
+            .from(TICKET_ATTACHMENTS_BUCKET)
+            .upload(filePath, arrayBuffer, {
+                contentType: params.mimeType || undefined,
+                upsert: false,
+            });
+
+        if (error) {
+            throw error;
+        }
+
+        return filePath;
+    } catch (error: any) {
+        const message = String(error?.message || '').toLowerCase();
+        if (message.includes('network request failed')) {
+            throw new Error('No se pudo procesar la imagen adjunta. Intenta seleccionarla nuevamente.');
+        }
         throw error;
+    } finally {
+        await cleanup();
     }
-
-    return filePath;
 };
 
 export const ticketService = {

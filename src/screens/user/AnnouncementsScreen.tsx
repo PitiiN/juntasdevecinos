@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     Alert,
     Image,
@@ -88,6 +88,15 @@ export default function AnnouncementsScreen() {
         audioPlayerRef.current = audioPlayer;
     }, [audioPlayer]);
 
+    useEffect(() => {
+        void Audio.setAudioModeAsync({
+            allowsRecordingIOS: false,
+            playsInSilentModeIOS: true,
+            shouldDuckAndroid: true,
+            playThroughEarpieceAndroid: false,
+        });
+    }, []);
+
     const loadAnnouncements = useCallback(async (markSeen = false) => {
         if (!organizationId) {
             setAnnouncements([]);
@@ -156,16 +165,21 @@ export default function AnnouncementsScreen() {
         try {
             const permission = await Audio.requestPermissionsAsync();
             if (permission.status !== 'granted') {
-                Alert.alert('Permiso denegado', 'Se necesita acceso al microfono para grabar audio.');
+                Alert.alert('Permiso denegado', 'Se necesita acceso al micrófono para grabar audio.');
                 return;
             }
 
-            await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
+            await Audio.setAudioModeAsync({
+                allowsRecordingIOS: true,
+                playsInSilentModeIOS: true,
+                shouldDuckAndroid: true,
+                playThroughEarpieceAndroid: false,
+            });
             const result = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
             setRecording(result.recording);
         } catch (error) {
             console.error(error);
-            Alert.alert('Error', 'No se pudo iniciar la grabacion.');
+            Alert.alert('Error', 'No se pudo iniciar la grabación.');
         }
     };
 
@@ -186,10 +200,15 @@ export default function AnnouncementsScreen() {
                     mimeType: 'audio/m4a',
                 });
             }
-            await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
+            await Audio.setAudioModeAsync({
+                allowsRecordingIOS: false,
+                playsInSilentModeIOS: true,
+                shouldDuckAndroid: true,
+                playThroughEarpieceAndroid: false,
+            });
         } catch (error) {
             console.error(error);
-            Alert.alert('Error', 'No se pudo procesar la grabacion.');
+            Alert.alert('Error', 'No se pudo procesar la grabación.');
         }
     };
 
@@ -217,7 +236,7 @@ export default function AnnouncementsScreen() {
     const openCamera = async (type: 'image' | 'video') => {
         const permission = await ImagePicker.requestCameraPermissionsAsync();
         if (permission.status !== 'granted') {
-            Alert.alert('Permiso denegado', 'Se necesita acceso a la camara.');
+            Alert.alert('Permiso denegado', 'Se necesita acceso a la cámara.');
             return;
         }
 
@@ -241,7 +260,7 @@ export default function AnnouncementsScreen() {
     const openGallery = async (type: 'image' | 'video') => {
         const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (permission.status !== 'granted') {
-            Alert.alert('Permiso denegado', 'Se necesita acceso a la galeria.');
+            Alert.alert('Permiso denegado', 'Se necesita acceso a la galería.');
             return;
         }
 
@@ -280,8 +299,8 @@ export default function AnnouncementsScreen() {
             `Adjuntar ${type === 'image' ? 'imagen' : 'video'}`,
             'Elige el origen del archivo.',
             [
-                { text: 'Camara', onPress: () => openCamera(type) },
-                { text: 'Galeria', onPress: () => openGallery(type) },
+                { text: 'Cámara', onPress: () => openCamera(type) },
+                { text: 'Galería', onPress: () => openGallery(type) },
                 { text: 'Cancelar', style: 'cancel' },
             ]
         );
@@ -295,7 +314,7 @@ export default function AnnouncementsScreen() {
 
     const handleSendReply = async (announcementId: string) => {
         if (!organizationId || !user) {
-            Alert.alert('Error', 'No se pudo resolver tu organizacion o usuario.');
+            Alert.alert('Error', 'No se pudo resolver tu organización o usuario.');
             return;
         }
 
@@ -338,6 +357,13 @@ export default function AnnouncementsScreen() {
 
     const handlePlayAudio = async (uri: string, id: string) => {
         try {
+            await Audio.setAudioModeAsync({
+                allowsRecordingIOS: false,
+                playsInSilentModeIOS: true,
+                shouldDuckAndroid: true,
+                playThroughEarpieceAndroid: false,
+            });
+
             if (audioPlayer) {
                 await audioPlayer.stopAsync();
                 await audioPlayer.unloadAsync();
@@ -675,3 +701,5 @@ const s = StyleSheet.create({
     modalCloseText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 16 },
     fullScreenMedia: { width: '100%', height: '80%' },
 });
+
+

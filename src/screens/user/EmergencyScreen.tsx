@@ -17,11 +17,11 @@ export default function EmergencyScreen() {
     ];
 
     const communityButtons = [
-        { title: 'Gestor Territorial', sub: 'Contacto municipal', emoji: '🏛️', number: '000000000', color: '#0891B2' },
-        { title: 'Seguridad Ciudadana', sub: 'Alarmas comunitarias', emoji: '🛡️', number: '000000000', color: '#4F46E5' },
-        { title: 'Comisaría San Miguel', sub: 'Subcomisaría local', emoji: '🏢', number: '000000000', color: '#1D4ED8' },
-        { title: 'Cesfam Angel Guarello', sub: 'Centro de salud', emoji: '🏥', number: '000000000', color: '#059669' },
-        { title: 'Cesfam Recreo', sub: 'Centro de salud', emoji: '🏥', number: '000000000', color: '#10B981' },
+        { title: 'Gestor Territorial Bruce Carvajal', sub: 'Contacto municipal', emoji: '\u{1F3DB}\uFE0F', number: '56995887239', color: '#0891B2' },
+        { title: 'Seguridad Ciudadana', sub: 'Alarmas comunitarias', emoji: '\u{1F6E1}\uFE0F', number: '1456', color: '#4F46E5' },
+        { title: 'Comisar\u00EDa San Miguel', sub: 'Subcomisar\u00EDa local', emoji: '\u{1F3E2}', number: '229222960', color: '#1D4ED8' },
+        { title: 'Cesfam Angel Guarello', sub: 'Centro de salud', emoji: '\u{1F3E5}', number: '224063450', color: '#059669' },
+        { title: 'Cesfam Recreo', sub: 'Centro de salud', emoji: '\u{1F3E5}', number: '224063500', color: '#10B981' },
     ];
 
     const renderBtn = (item: typeof emergencyButtons[0], i: number) => (
@@ -63,3 +63,4 @@ const s = StyleSheet.create({
     btnSub: { fontSize: 11, color: 'rgba(255,255,255,0.8)', marginTop: 2 },
     btnNum: { fontSize: 18, fontWeight: 'bold', color: '#FFFFFF' },
 });
+

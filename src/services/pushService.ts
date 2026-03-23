@@ -95,6 +95,7 @@ export const pushService = {
 
     async sendPushNotification(payload: {
         organization_id: string;
+        token?: string;
         title: string;
         body: string;
         type: NotificationType;
@@ -106,14 +107,18 @@ export const pushService = {
             type: payload.type === 'poll' ? 'announcement' : payload.type,
         };
 
+        console.log('[PushService] Invoking send_push with:', JSON.stringify(normalizedPayload, null, 2));
+
         const { data, error } = await supabase.functions.invoke('send_push', {
             body: normalizedPayload,
         });
 
         if (error) {
+            console.error('[PushService] Edge Function Error:', error);
             throw error;
         }
 
+        console.log('[PushService] send_push response:', data);
         return data;
     },
 

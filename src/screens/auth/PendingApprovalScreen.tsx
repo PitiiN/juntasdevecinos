@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -37,7 +37,7 @@ export default function PendingApprovalScreen() {
             const data = await accessRequestService.listJoinableOrganizations();
             setOrganizations(data);
         } catch (error: any) {
-            Alert.alert('No se pudo cargar la lista de organizaciones', error?.message || 'Intentalo nuevamente.');
+            Alert.alert('No se pudo cargar la lista de organizaciónes', error?.message || 'Inténtalo nuevamente.');
         } finally {
             setLoadingOrganizations(false);
         }
@@ -52,19 +52,19 @@ export default function PendingApprovalScreen() {
         pendingMembershipRequest?.status === 'rejected'
             ? 'Solicitud rechazada'
             : pendingMembershipRequest?.status === 'pending'
-                ? 'Solicitud pendiente de aprobacion'
-                : 'Aun no tienes acceso a una JJVV';
+                ? 'Solicitud pendiente de aprobación'
+                : 'Aún no tienes acceso a una JJVV';
 
     const statusBody =
         pendingMembershipRequest?.status === 'rejected'
             ? `Tu solicitud a ${pendingMembershipRequest.organizationName} fue rechazada.${pendingMembershipRequest.rejectionReason ? ` Motivo: ${pendingMembershipRequest.rejectionReason}` : ''}`
             : pendingMembershipRequest?.status === 'pending'
                 ? `Tu solicitud para unirte a ${pendingMembershipRequest.organizationName} fue enviada correctamente. Un administrador debe aprobarla antes de darte acceso a la app.`
-                : 'Debes seleccionar una Junta de Vecinos y enviar una solicitud. Hasta que la aprueben no tendras acceso a las funciones comunitarias.';
+                : 'Debes seleccionar una Junta de Vecinos y enviar una solicitud. Hasta que la aprueben no tendrás acceso a las funciones comunitarias.';
 
     const submitRequest = async () => {
         if (!selectedOrganizationId) {
-            Alert.alert('Selecciona una organizacion', 'Debes elegir la JJVV a la que deseas unirte.');
+            Alert.alert('Selecciona una organización', 'Debes elegir la JJVV a la que deseas unirte.');
             return;
         }
 
@@ -77,11 +77,11 @@ export default function PendingApprovalScreen() {
             ]);
             Alert.alert(
                 'Solicitud enviada',
-                `Tu acceso quedo pendiente de aprobacion para ${selectedOrganization?.name || 'la organizacion seleccionada'}.`,
+                `Tu acceso quedó pendiente de aprobación para ${selectedOrganization?.name || 'la organización seleccionada'}.`,
             );
             setShowOrgModal(false);
         } catch (error: any) {
-            Alert.alert('No se pudo enviar la solicitud', error?.message || 'Intentalo nuevamente.');
+            Alert.alert('No se pudo enviar la solicitud', error?.message || 'Inténtalo nuevamente.');
         } finally {
             setSubmitting(false);
         }
@@ -90,7 +90,7 @@ export default function PendingApprovalScreen() {
     const handleDeleteAccount = async () => {
         Alert.alert(
             'Eliminar cuenta',
-            'Esta accion eliminara tu cuenta de la app. Solo continua si estas seguro.',
+            'Esta acción eliminara tu cuenta de la app. Solo continua si estas seguro.',
             [
                 { text: 'Cancelar', style: 'cancel' },
                 {
@@ -100,7 +100,7 @@ export default function PendingApprovalScreen() {
                         try {
                             await deleteAccount();
                         } catch (error: any) {
-                            Alert.alert('No se pudo eliminar la cuenta', error?.message || 'Intentalo nuevamente.');
+                            Alert.alert('No se pudo eliminar la cuenta', error?.message || 'Inténtalo nuevamente.');
                         }
                     },
                 },
@@ -112,7 +112,7 @@ export default function PendingApprovalScreen() {
         <SafeAreaView style={s.safe}>
             <ScrollView contentContainerStyle={s.scroll}>
                 <View style={s.hero}>
-                    <Text style={s.title}>Acceso restringido hasta aprobacion</Text>
+                    <Text style={s.title}>Acceso restringido hasta aprobación</Text>
                     <Text style={s.subtitle}>{statusBody}</Text>
                     <Text style={s.meta}>Cuenta: {user?.email || 'Sin correo'}</Text>
                 </View>
@@ -121,8 +121,8 @@ export default function PendingApprovalScreen() {
                     <Text style={s.cardTitle}>{statusTitle}</Text>
                     <Text style={s.cardText}>
                         {pendingMembershipRequest
-                            ? `Organizacion solicitada: ${pendingMembershipRequest.organizationName}`
-                            : 'Todavia no has enviado una solicitud de ingreso.'}
+                            ? `Organización solicitada: ${pendingMembershipRequest.organizationName}`
+                            : 'Todavía no has enviado una solicitud de ingreso.'}
                     </Text>
                     {pendingMembershipRequest?.createdAt && (
                         <Text style={s.helper}>
@@ -137,12 +137,16 @@ export default function PendingApprovalScreen() {
                     </Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={s.secondaryButton} onPress={() => void refreshSession()}>
-                    <Text style={s.secondaryButtonText}>Ya me aprobaron, actualizar acceso</Text>
-                </TouchableOpacity>
+                {pendingMembershipRequest?.status === 'pending' && (
+                    <View style={s.pendingInfoBox}>
+                        <Text style={s.pendingInfoText}>
+                            Tu estado se verifica automáticamente. Cuando te aprueben, entrarás a la app sin hacer nada más.
+                        </Text>
+                    </View>
+                )}
 
                 <TouchableOpacity style={s.secondaryButton} onPress={signOut}>
-                    <Text style={s.secondaryButtonText}>Cerrar sesion</Text>
+                    <Text style={s.secondaryButtonText}>Cerrar sesión</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity style={s.deleteButton} onPress={handleDeleteAccount}>
@@ -153,7 +157,7 @@ export default function PendingApprovalScreen() {
             <Modal visible={showOrgModal} transparent animationType="fade">
                 <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => setShowOrgModal(false)}>
                     <View style={s.modalCard} onStartShouldSetResponder={() => true}>
-                        <Text style={s.modalTitle}>Selecciona tu organizacion</Text>
+                        <Text style={s.modalTitle}>Selecciona tu organización</Text>
                         <Text style={s.modalSubtitle}>
                             El administrador de esa JJVV debera aprobar tu ingreso antes de habilitar la app.
                         </Text>
@@ -248,6 +252,15 @@ const s = StyleSheet.create({
         marginBottom: 10,
     },
     secondaryButtonText: { color: '#0F172A', fontSize: 15, fontWeight: '600' },
+    pendingInfoBox: {
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: '#BFDBFE',
+        backgroundColor: '#EFF6FF',
+        padding: 14,
+        marginBottom: 10,
+    },
+    pendingInfoText: { fontSize: 13, lineHeight: 18, color: '#1E40AF', textAlign: 'center', fontWeight: '500' },
     deleteButton: {
         backgroundColor: '#FEF2F2',
         borderRadius: 14,
@@ -302,3 +315,6 @@ const s = StyleSheet.create({
     modalCancelText: { color: '#64748B', fontSize: 14, fontWeight: '600' },
     disabledButton: { opacity: 0.55 },
 });
+
+
+

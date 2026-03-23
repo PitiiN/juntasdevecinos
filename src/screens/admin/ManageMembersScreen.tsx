@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+﻿import React, { useCallback, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, Modal, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -105,18 +105,18 @@ export default function ManageMembersScreen({ navigation }: any) {
         }
 
         if (member.id === currentUser?.id) {
-            Alert.alert('Accion no permitida', 'No puedes modificar tu propia membresia desde esta pantalla.');
+            Alert.alert('Acción no permitida', 'No puedes modificar tu propia membresía desde esta pantalla.');
             return;
         }
 
         if ((member.email || '').toLowerCase() === GLOBAL_SUPERADMIN_EMAIL) {
-            Alert.alert('Accion no permitida', 'La cuenta superadmin global esta protegida.');
+            Alert.alert('Acción no permitida', 'La cuenta superadmin global está protegida.');
             return;
         }
 
         Alert.alert(
             `Gestionar: ${member.name}`,
-            'Selecciona una accion:',
+            'Selecciona una acción:',
             [
                 {
                     text: 'Ver detalle',
@@ -174,7 +174,7 @@ export default function ManageMembersScreen({ navigation }: any) {
                 <Text style={s.title}>Socios y solicitudes</Text>
                 <Text style={s.subtitle}>{subtitle}</Text>
                 {organizationName && (
-                    <Text style={s.currentOrg}>Organizacion activa: {organizationName}</Text>
+                    <Text style={s.currentOrg}>Organización activa: {organizationName}</Text>
                 )}
 
                 {loading && <ActivityIndicator color="#2563EB" style={{ marginBottom: 12 }} />}
@@ -188,7 +188,7 @@ export default function ManageMembersScreen({ navigation }: any) {
 
                         {pendingRequests.length === 0 ? (
                             <View style={s.emptyCard}>
-                                <Text style={s.emptyText}>No hay solicitudes pendientes para esta organizacion.</Text>
+                                <Text style={s.emptyText}>No hay solicitudes pendientes para esta organización.</Text>
                             </View>
                         ) : (
                             pendingRequests.map((request) => (
@@ -444,3 +444,6 @@ const s = StyleSheet.create({
         marginBottom: 8,
     },
 });
+
+
+

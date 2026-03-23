@@ -42,3 +42,6 @@ yarn-error.*
 
 # APKs
 *.apk
+
+credentials.json
+credentials/

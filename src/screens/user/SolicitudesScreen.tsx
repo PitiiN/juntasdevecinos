@@ -36,7 +36,7 @@ export default function SolicitudesScreen({ navigation }: any) {
 
         const result = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ['images'],
-            allowsEditing: true,
+            allowsEditing: false,
             quality: 0.7,
         });
 
@@ -57,7 +57,7 @@ export default function SolicitudesScreen({ navigation }: any) {
         }
 
         const result = await ImagePicker.launchCameraAsync({
-            allowsEditing: true,
+            allowsEditing: false,
             quality: 0.7,
         });
 
@@ -128,7 +128,7 @@ export default function SolicitudesScreen({ navigation }: any) {
                     <Text style={s.backText}>← Volver</Text>
                 </TouchableOpacity>
 
-                <Text style={s.title}>📝 Nueva Solicitud</Text>
+                <Text style={s.title}>📝 Nueva solicitud</Text>
                 <Text style={s.subtitle}>Cuéntanos qué necesitas o qué problema detectaste.</Text>
 
                 <Text style={s.label}>Categoría</Text>
@@ -195,7 +195,7 @@ export default function SolicitudesScreen({ navigation }: any) {
                 )}
 
                 <TouchableOpacity style={[s.submitBtn, loading && s.submitDisabled]} onPress={handleSubmit} disabled={loading}>
-                    <Text style={s.submitText}>{loading ? 'Enviando...' : '✅ Enviar Solicitud'}</Text>
+                    <Text style={s.submitText}>{loading ? 'Enviando...' : ' Enviar Solicitud'}</Text>
                 </TouchableOpacity>
             </ScrollView>
         </SafeAreaView>
@@ -274,3 +274,7 @@ const s = StyleSheet.create({
     submitDisabled: { opacity: 0.6 },
     submitText: { color: '#FFFFFF', fontSize: 18, fontWeight: 'bold' },
 });
+
+
+
+

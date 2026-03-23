@@ -12,6 +12,15 @@ type DirectivaMember = {
     full_name: string | null;
 };
 
+type OrganizationInfo = {
+    name: string | null;
+    region: string | null;
+    commune: string | null;
+    address: string | null;
+    phone: string | null;
+    email: string | null;
+};
+
 const BOARD_STRUCTURE: { role: Role; label: string; emoji: string }[] = [
     { role: 'president', label: 'Presidencia', emoji: '👑' },
     { role: 'director', label: 'Dirección', emoji: '🧭' },
@@ -24,6 +33,7 @@ const DIRECTIVA_BUCKET = 'jjvv-directiva';
 export default function DirectivaScreen({ navigation }: any) {
     const { organizationId, organizationName, directivaImageUrl, role, viewMode, refreshSession } = useAuth();
     const [members, setMembers] = useState<DirectivaMember[]>([]);
+    const [organizationInfo, setOrganizationInfo] = useState<OrganizationInfo | null>(null);
     const [loading, setLoading] = useState(true);
     const [uploading, setUploading] = useState(false);
     const [resolvedImageUrl, setResolvedImageUrl] = useState<string | null>(null);
@@ -68,6 +78,7 @@ export default function DirectivaScreen({ navigation }: any) {
     const fetchDirectiva = async () => {
         if (!organizationId) {
             setMembers([]);
+            setOrganizationInfo(null);
             setLoading(false);
             return;
         }
@@ -75,20 +86,32 @@ export default function DirectivaScreen({ navigation }: any) {
         setLoading(true);
 
         try {
-            const { data, error } = await supabase.rpc('list_board_members', {
-                p_org_id: organizationId,
-            });
+            const [boardResult, orgResult] = await Promise.all([
+                supabase.rpc('list_board_members', { p_org_id: organizationId }),
+                supabase
+                    .from('organizations')
+                    .select('name, region, commune, address, phone, email')
+                    .eq('id', organizationId)
+                    .single(),
+            ]);
 
-            if (error) {
-                console.error('Error fetching directiva:', error);
+            if (boardResult.error) {
+                console.error('Error fetching directiva:', boardResult.error);
                 setMembers([]);
-                return;
+            } else {
+                setMembers((boardResult.data || []) as DirectivaMember[]);
             }
 
-            setMembers((data || []) as DirectivaMember[]);
+            if (orgResult.error) {
+                console.error('Error fetching organization info:', orgResult.error);
+                setOrganizationInfo(null);
+            } else {
+                setOrganizationInfo((orgResult.data as OrganizationInfo) || null);
+            }
         } catch (err) {
             console.error('Unexpected error fetching directiva:', err);
             setMembers([]);
+            setOrganizationInfo(null);
         } finally {
             setLoading(false);
         }
@@ -196,6 +219,32 @@ export default function DirectivaScreen({ navigation }: any) {
                     )}
                 </View>
 
+                {organizationInfo && (
+                    <View style={s.orgInfoCard}>
+                        <Text style={s.orgInfoTitle}>Información de la Organización</Text>
+                        <Text style={s.orgInfoLine}>
+                            <Text style={s.orgInfoLabel}>Nombre: </Text>
+                            {organizationInfo.name || organizationName || 'No disponible'}
+                        </Text>
+                        <Text style={s.orgInfoLine}>
+                            <Text style={s.orgInfoLabel}>Región / Comuna: </Text>
+                            {[organizationInfo.region, organizationInfo.commune].filter(Boolean).join(' / ') || 'No disponible'}
+                        </Text>
+                        <Text style={s.orgInfoLine}>
+                            <Text style={s.orgInfoLabel}>Dirección: </Text>
+                            {organizationInfo.address || 'No disponible'}
+                        </Text>
+                        <Text style={s.orgInfoLine}>
+                            <Text style={s.orgInfoLabel}>Teléfono: </Text>
+                            {organizationInfo.phone || 'No disponible'}
+                        </Text>
+                        <Text style={s.orgInfoLine}>
+                            <Text style={s.orgInfoLabel}>Email: </Text>
+                            {organizationInfo.email || 'No disponible'}
+                        </Text>
+                    </View>
+                )}
+
                 {loading ? (
                     <ActivityIndicator size="large" color="#1E3A5F" style={{ marginTop: 40 }} />
                 ) : (
@@ -232,6 +281,19 @@ const s = StyleSheet.create({
         elevation: 4,
     },
     uploadText: { color: '#FFFFFF', fontSize: 13, fontWeight: '600' },
+    orgInfoCard: {
+        backgroundColor: '#FFFFFF',
+        marginHorizontal: 16,
+        marginTop: 16,
+        padding: 14,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        elevation: 1,
+    },
+    orgInfoTitle: { fontSize: 15, fontWeight: '700', color: '#1E3A5F', marginBottom: 8 },
+    orgInfoLine: { fontSize: 13, color: '#334155', marginBottom: 4 },
+    orgInfoLabel: { fontWeight: '700', color: '#0F172A' },
     structureList: { padding: 20 },
     sectionContainer: { marginBottom: 20 },
     sectionTitle: {

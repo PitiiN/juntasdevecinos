@@ -77,6 +77,74 @@ export const pollService = {
         return poll;
     },
 
+    async updatePoll(params: {
+        pollId: string;
+        question: string;
+        deadline: string;
+        allowMultiple: boolean;
+        options: string[];
+    }) {
+        const { error: pollError } = await supabase
+            .from('polls')
+            .update({
+                question: params.question,
+                deadline: params.deadline,
+                allow_multiple: params.allowMultiple,
+            })
+            .eq('id', params.pollId);
+
+        if (pollError) throw pollError;
+
+        const { data: existingOptions, error: existingError } = await supabase
+            .from('poll_options')
+            .select('id, sort_order')
+            .eq('poll_id', params.pollId)
+            .order('sort_order', { ascending: true });
+
+        if (existingError) throw existingError;
+
+        const normalizedOptions = params.options.map((option) => option.trim()).filter(Boolean);
+        const currentOptions = existingOptions || [];
+
+        if (normalizedOptions.length < currentOptions.length) {
+            throw new Error('Esta edición no permite eliminar opciones existentes. Puedes editarlas o agregar nuevas.');
+        }
+
+        for (let index = 0; index < currentOptions.length; index += 1) {
+            const current = currentOptions[index];
+            const nextText = normalizedOptions[index];
+
+            if (!nextText) {
+                throw new Error('Completa el texto de todas las opciones existentes antes de guardar.');
+            }
+
+            const { error: updateOptionError } = await supabase
+                .from('poll_options')
+                .update({
+                    option_text: nextText,
+                    sort_order: index,
+                })
+                .eq('id', current.id);
+
+            if (updateOptionError) throw updateOptionError;
+        }
+
+        const newOptions = normalizedOptions.slice(currentOptions.length);
+        if (newOptions.length > 0) {
+            const { error: insertError } = await supabase
+                .from('poll_options')
+                .insert(
+                    newOptions.map((option, index) => ({
+                        poll_id: params.pollId,
+                        option_text: option,
+                        sort_order: currentOptions.length + index,
+                    }))
+                );
+
+            if (insertError) throw insertError;
+        }
+    },
+
     async deletePoll(id: string) {
         const { error } = await supabase
             .from('polls')

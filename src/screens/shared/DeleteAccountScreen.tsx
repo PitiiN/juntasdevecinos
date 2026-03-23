@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+﻿import React, { useMemo, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -37,7 +37,7 @@ export default function DeleteAccountScreen({ navigation }: any) {
 
     const deletedItems = useMemo(
         () => [
-            'Tu acceso a la app y la sesion actual.',
+            'Tu acceso a la app y la sesión actual.',
             'Tu perfil personal, membresias y tokens de notificaciones.',
             'Tus votos, inscripciones, favores, respuestas, alertas y solicitudes creadas por ti.',
             'Archivos privados personales asociados a cuotas, respuestas y solicitudes.',
@@ -48,7 +48,7 @@ export default function DeleteAccountScreen({ navigation }: any) {
     const handleDelete = async () => {
         Alert.alert(
             'Eliminar cuenta',
-            'Esta accion no se puede deshacer. Se eliminara tu acceso y tus datos personales eliminables dentro de la app JJVV.',
+            'Esta acción no se puede deshacer. Se eliminara tu acceso y tus datos personales eliminables dentro de la app JJVV.',
             [
                 { text: 'Cancelar', style: 'cancel' },
                 {
@@ -60,10 +60,10 @@ export default function DeleteAccountScreen({ navigation }: any) {
                             await deleteAccount();
                             Alert.alert(
                                 'Cuenta eliminada',
-                                'Tu cuenta fue eliminada de la app. Si necesitas volver, tendras que registrarte de nuevo y ser incorporado otra vez a una JJVV.',
+                                'Tu cuenta fue eliminada de la app. Si necesitas volver, tendrás que registrarte de nuevo y ser incorporado otra vez a una JJVV.',
                             );
                         } catch (error: any) {
-                            Alert.alert('No se pudo eliminar la cuenta', error?.message || 'Intentalo nuevamente.');
+                            Alert.alert('No se pudo eliminar la cuenta', error?.message || 'Inténtalo nuevamente.');
                         } finally {
                             setIsSubmitting(false);
                         }
@@ -227,3 +227,5 @@ const s = StyleSheet.create({
         fontWeight: '700',
     },
 });
+
+

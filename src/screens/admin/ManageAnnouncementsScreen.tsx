@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -75,6 +75,8 @@ export default function ManageAnnouncementsScreen() {
     const [showForm, setShowForm] = useState(false);
     const [formType, setFormType] = useState<'aviso' | 'encuesta'>('aviso');
     const [editId, setEditId] = useState<string | null>(null);
+    const [editingPollId, setEditingPollId] = useState<string | null>(null);
+    const [selectedPoll, setSelectedPoll] = useState<CommunityPoll | null>(null);
     const [title, setTitle] = useState('');
     const [body, setBody] = useState('');
     const [location, setLocation] = useState('');
@@ -141,6 +143,7 @@ export default function ManageAnnouncementsScreen() {
     const resetForm = () => {
         setShowForm(false);
         setEditId(null);
+        setEditingPollId(null);
         setFormType('aviso');
         setTitle('');
         setBody('');
@@ -160,6 +163,7 @@ export default function ManageAnnouncementsScreen() {
 
     const startEdit = (announcement: CommunityAnnouncement) => {
         setEditId(announcement.id);
+        setEditingPollId(null);
         setShowForm(true);
         setFormType('aviso');
         setTitle(announcement.title);
@@ -175,6 +179,18 @@ export default function ManageAnnouncementsScreen() {
             setNoExpiry(true);
             setExpiresAtDate(null);
         }
+    };
+
+    const startEditPoll = (poll: CommunityPoll) => {
+        setEditId(null);
+        setEditingPollId(poll.id);
+        setShowForm(true);
+        setFormType('encuesta');
+        setPollQuestion(poll.question);
+        setPollDeadline(new Date(poll.deadline).toISOString().split('T')[0]);
+        setAllowMultiple(poll.allowMultiple);
+        setPollOptions(poll.options.map((option) => option.text));
+        setSendPush(false);
     };
 
     const filteredAnnouncements = useMemo(
@@ -210,12 +226,12 @@ export default function ManageAnnouncementsScreen() {
     const handleSave = async () => {
         if (formType === 'aviso') {
             if (!organizationId || !user) {
-                Alert.alert('Error', 'No se pudo resolver tu organizacion o usuario.');
+                Alert.alert('Error', 'No se pudo resolver tu organización o usuario.');
                 return;
             }
 
             if (!title.trim() || !body.trim()) {
-                Alert.alert('Error', 'Completa titulo y contenido.');
+                Alert.alert('Error', 'Completa título y contenido.');
                 return;
             }
 
@@ -231,7 +247,7 @@ export default function ManageAnnouncementsScreen() {
             try {
                 if (editId) {
                     await announcementService.updateAnnouncement(editId, payload);
-                    Alert.alert('Aviso actualizado', 'El aviso quedo actualizado.');
+                    Alert.alert('Aviso actualizado', 'El aviso quedó actualizado.');
                 } else {
                     await announcementService.createAnnouncement({
                         organization_id: organizationId,
@@ -253,7 +269,7 @@ export default function ManageAnnouncementsScreen() {
                         });
                     }
 
-                    Alert.alert('Aviso publicado', 'El aviso quedo disponible para la comunidad.');
+                    Alert.alert('Aviso publicado', 'El aviso quedó disponible para la comunidad.');
                 }
 
                 await loadAnnouncements();
@@ -266,40 +282,52 @@ export default function ManageAnnouncementsScreen() {
 
         const validOptions = pollOptions.map((option) => option.trim()).filter(Boolean);
         if (!pollQuestion.trim() || validOptions.length < 2 || !pollDeadline.trim()) {
-            Alert.alert('Error', 'Completa la pregunta, la fecha limite y al menos dos opciones.');
+            Alert.alert('Error', 'Completa la pregunta, la fecha límite y al menos dos opciones.');
             return;
         }
 
         if (!organizationId || !user) {
-            Alert.alert('Error', 'No se pudo resolver tu organizacion o usuario.');
+            Alert.alert('Error', 'No se pudo resolver tu organización o usuario.');
             return;
         }
 
         try {
-            await pollService.createPoll({
-                organizationId,
-                userId: user.id,
-                question: pollQuestion.trim(),
-                deadline: new Date(pollDeadline).toISOString(),
-                allowMultiple,
-                options: validOptions,
-            });
-
-            if (sendPush) {
-                await pushService.broadcastPushNotification({
-                    organization_id: organizationId,
-                    title: 'Nueva encuesta comunitaria',
-                    body: pollQuestion.trim(),
-                    type: 'poll',
-                    payload: {
-                        deadline: pollDeadline,
-                        allowMultiple,
-                    },
+            if (editingPollId) {
+                await pollService.updatePoll({
+                    pollId: editingPollId,
+                    question: pollQuestion.trim(),
+                    deadline: new Date(pollDeadline).toISOString(),
+                    allowMultiple,
+                    options: validOptions,
                 });
+                Alert.alert('Encuesta actualizada', 'La encuesta se actualizó correctamente.');
+            } else {
+                await pollService.createPoll({
+                    organizationId,
+                    userId: user.id,
+                    question: pollQuestion.trim(),
+                    deadline: new Date(pollDeadline).toISOString(),
+                    allowMultiple,
+                    options: validOptions,
+                });
+
+                if (sendPush) {
+                    await pushService.broadcastPushNotification({
+                        organization_id: organizationId,
+                        title: 'Nueva encuesta comunitaria',
+                        body: pollQuestion.trim(),
+                        type: 'poll',
+                        payload: {
+                            deadline: pollDeadline,
+                            allowMultiple,
+                        },
+                    });
+                }
+
+                Alert.alert('Encuesta publicada', 'La encuesta quedó disponible para la comunidad.');
             }
 
             await loadPolls();
-            Alert.alert('Encuesta publicada', 'La encuesta quedo disponible para la comunidad.');
             resetForm();
         } catch (error: any) {
             Alert.alert('Error', error.message || 'No se pudo publicar la encuesta.');
@@ -334,7 +362,7 @@ export default function ManageAnnouncementsScreen() {
             <Text style={s.cardTitle}>{announcement.title}</Text>
             {(announcement.schedule || announcement.location) && (
                 <Text style={s.cardMeta}>
-                    {[announcement.schedule, announcement.location].filter(Boolean).join(' • ')}
+                    {[announcement.schedule, announcement.location].filter(Boolean).join('  ')}
                 </Text>
             )}
             <Text style={s.cardBody} numberOfLines={2}>{announcement.body}</Text>
@@ -360,6 +388,49 @@ export default function ManageAnnouncementsScreen() {
             </View>
         </View>
     );
+
+    const renderPollCard = (poll: CommunityPoll, historic = false) => {
+        const percentage = (votes: number) => (poll.totalVotes > 0 ? Math.round((votes / poll.totalVotes) * 100) : 0);
+
+        return (
+            <View key={poll.id} style={[s.card, historic && s.historicCard]}>
+                <TouchableOpacity onPress={() => setSelectedPoll(poll)} activeOpacity={0.75}>
+                    <Text style={s.cardTitle}>{poll.question}</Text>
+                    <Text style={s.cardMeta}>
+                        {historic ? 'Cerrada' : 'Cierra'}: {new Date(poll.deadline).toLocaleDateString('es-CL')}
+                    </Text>
+                    <View style={s.pollSummary}>
+                        {poll.options.slice(0, 3).map((option) => (
+                            <Text key={option.id} style={s.pollSummaryOption}>
+                                 {option.text} ({option.votes} voto{option.votes === 1 ? '' : 's'}, {percentage(option.votes)}%)
+                            </Text>
+                        ))}
+                        {poll.options.length > 3 && (
+                            <Text style={s.pollSummaryOption}> +{poll.options.length - 3} opciones más</Text>
+                        )}
+                    </View>
+                </TouchableOpacity>
+                <View style={s.cardFooter}>
+                    <View style={[s.priorityBadge, historic ? s.historicBadge : s.pollBadge]}>
+                        <Text style={[s.priorityText, historic ? s.historicBadgeText : s.pollBadgeText]}>
+                            {poll.totalVotes} votos
+                        </Text>
+                    </View>
+                    <View style={s.cardActions}>
+                        <TouchableOpacity onPress={() => setSelectedPoll(poll)} style={s.actionButton}>
+                            <Text style={s.actionText}>Detalle</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => startEditPoll(poll)} style={s.actionButton}>
+                            <Text style={s.actionText}>Editar</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => handleDelete(poll.id, poll.question, true)} style={s.actionButton}>
+                            <Text style={[s.actionText, s.deleteText]}>Eliminar</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </View>
+        );
+    };
 
     const loading = loadingAnnouncements || loadingPolls;
 
@@ -387,7 +458,7 @@ export default function ManageAnnouncementsScreen() {
                 </ScrollView>
 
                 <TouchableOpacity style={s.newButton} onPress={() => (showForm ? resetForm() : setShowForm(true))}>
-                    <Text style={s.newButtonText}>{showForm ? 'Cancelar' : 'Nueva publicacion'}</Text>
+                    <Text style={s.newButtonText}>{showForm ? 'Cancelar' : 'Nueva publicación'}</Text>
                 </TouchableOpacity>
 
                 {showForm && (
@@ -408,15 +479,17 @@ export default function ManageAnnouncementsScreen() {
                         </View>
 
                         <Text style={s.formTitle}>
-                            {editId ? 'Editar publicacion' : `Nueva ${formType === 'aviso' ? 'publicacion' : 'encuesta'}`}
+                            {editId || editingPollId
+                                ? `Editar ${formType === 'aviso' ? 'publicación' : 'encuesta'}`
+                                : `Nueva ${formType === 'aviso' ? 'publicación' : 'encuesta'}`}
                         </Text>
 
                         {formType === 'aviso' ? (
                             <>
-                                <Text style={s.label}>Titulo</Text>
+                                <Text style={s.label}>Título</Text>
                                 <TextInput
                                     style={s.input}
-                                    placeholder="Titulo del aviso"
+                                    placeholder="Título del aviso"
                                     placeholderTextColor="#94A3B8"
                                     value={title}
                                     onChangeText={setTitle}
@@ -514,10 +587,10 @@ export default function ManageAnnouncementsScreen() {
                                     value={pollQuestion}
                                     onChangeText={setPollQuestion}
                                 />
-                                <Text style={s.label}>Fecha limite</Text>
+                                <Text style={s.label}>Fecha límite</Text>
                                 <TouchableOpacity style={[s.input, s.dateInput]} onPress={() => setShowDatePicker(true)}>
                                     <Text style={{ color: pollDeadline ? '#0F172A' : '#94A3B8' }}>
-                                        {pollDeadline || 'Seleccionar fecha limite'}
+                                        {pollDeadline || 'Seleccionar fecha límite'}
                                     </Text>
                                 </TouchableOpacity>
                                 {showDatePicker && (
@@ -537,7 +610,7 @@ export default function ManageAnnouncementsScreen() {
                                 <Text style={s.label}>Opciones</Text>
                                 {pollOptions.map((option, index) => (
                                     <TextInput
-                                        key={`${index}-${option}`}
+                                        key={`poll-opt-${index}`}
                                         style={[s.input, s.optionInput]}
                                         placeholder={`Opcion ${index + 1}`}
                                         placeholderTextColor="#94A3B8"
@@ -550,7 +623,7 @@ export default function ManageAnnouncementsScreen() {
                                     />
                                 ))}
                                 <TouchableOpacity onPress={() => setPollOptions([...pollOptions, ''])}>
-                                    <Text style={s.addOptionText}>+ Anadir opcion</Text>
+                                    <Text style={s.addOptionText}>+ Añadir opción</Text>
                                 </TouchableOpacity>
                                 <View style={s.pushToggleRow}>
                                     <Text style={s.pushToggleLabel}>Permitir multiples respuestas</Text>
@@ -564,7 +637,7 @@ export default function ManageAnnouncementsScreen() {
                             </>
                         )}
 
-                        {!editId && (
+                        {!editId && !editingPollId && (
                             <View style={s.pushToggleRow}>
                                 <Text style={s.pushToggleLabel}>Enviar notificacion push</Text>
                                 <Switch
@@ -577,7 +650,7 @@ export default function ManageAnnouncementsScreen() {
                         )}
 
                         <TouchableOpacity style={s.submitButton} onPress={handleSave} disabled={loading}>
-                            <Text style={s.submitButtonText}>{editId ? 'Guardar cambios' : 'Publicar'}</Text>
+                            <Text style={s.submitButtonText}>{editId || editingPollId ? 'Guardar cambios' : 'Publicar'}</Text>
                         </TouchableOpacity>
                     </View>
                 )}
@@ -585,20 +658,7 @@ export default function ManageAnnouncementsScreen() {
                 {activePolls.length > 0 && (
                     <>
                         <Text style={s.section}>Encuestas activas ({activePolls.length})</Text>
-                        {activePolls.map((poll) => (
-                            <View key={poll.id} style={s.card}>
-                                <Text style={s.cardTitle}>{poll.question}</Text>
-                                <Text style={s.cardMeta}>Cierra: {new Date(poll.deadline).toLocaleDateString('es-CL')}</Text>
-                                <View style={s.cardFooter}>
-                                    <View style={[s.priorityBadge, s.pollBadge]}>
-                                        <Text style={[s.priorityText, s.pollBadgeText]}>{poll.totalVotes} votos</Text>
-                                    </View>
-                                    <TouchableOpacity onPress={() => handleDelete(poll.id, poll.question, true)} style={s.actionButton}>
-                                        <Text style={[s.actionText, s.deleteText]}>Eliminar</Text>
-                                    </TouchableOpacity>
-                                </View>
-                            </View>
-                        ))}
+                        {activePolls.map((poll) => renderPollCard(poll))}
                     </>
                 )}
 
@@ -609,23 +669,10 @@ export default function ManageAnnouncementsScreen() {
                     <>
                         <TouchableOpacity style={s.historicButton} onPress={() => setShowHistoricPolls((current) => !current)}>
                             <Text style={s.historicButtonText}>
-                                {showHistoricPolls ? 'Ocultar' : 'Ver'} encuestas historicas ({historicPolls.length})
+                                {showHistoricPolls ? 'Ocultar' : 'Ver'} encuestas históricas ({historicPolls.length})
                             </Text>
                         </TouchableOpacity>
-                        {showHistoricPolls && historicPolls.map((poll) => (
-                            <View key={poll.id} style={[s.card, s.historicCard]}>
-                                <Text style={s.cardTitle}>{poll.question}</Text>
-                                <Text style={s.cardMeta}>Cerrada: {new Date(poll.deadline).toLocaleDateString('es-CL')}</Text>
-                                <View style={s.cardFooter}>
-                                    <View style={[s.priorityBadge, s.historicBadge]}>
-                                        <Text style={[s.priorityText, s.historicBadgeText]}>{poll.totalVotes} votos</Text>
-                                    </View>
-                                    <TouchableOpacity onPress={() => handleDelete(poll.id, poll.question, true)} style={s.actionButton}>
-                                        <Text style={[s.actionText, s.deleteText]}>Eliminar</Text>
-                                    </TouchableOpacity>
-                                </View>
-                            </View>
-                        ))}
+                        {showHistoricPolls && historicPolls.map((poll) => renderPollCard(poll, true))}
                     </>
                 )}
 
@@ -633,12 +680,60 @@ export default function ManageAnnouncementsScreen() {
                     <>
                         <TouchableOpacity style={s.historicButton} onPress={() => setShowHistoricAvisos((current) => !current)}>
                             <Text style={s.historicButtonText}>
-                                {showHistoricAvisos ? 'Ocultar' : 'Ver'} avisos historicos ({historicAnnouncements.length})
+                                {showHistoricAvisos ? 'Ocultar' : 'Ver'} avisos históricos ({historicAnnouncements.length})
                             </Text>
                         </TouchableOpacity>
                         {showHistoricAvisos && historicAnnouncements.map(renderAnnouncementCard)}
                     </>
                 )}
+
+                <Modal visible={Boolean(selectedPoll)} transparent animationType="fade" onRequestClose={() => setSelectedPoll(null)}>
+                    <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => setSelectedPoll(null)}>
+                        <View style={[s.modalContent, { maxWidth: 420, maxHeight: '80%' }]} onStartShouldSetResponder={() => true}>
+                            <Text style={s.modalTitle}>Detalle de encuesta</Text>
+                            {selectedPoll && (
+                                <ScrollView>
+                                    <Text style={s.pollDetailQuestion}>{selectedPoll.question}</Text>
+                                    <Text style={s.pollDetailMeta}>
+                                        Cierra: {new Date(selectedPoll.deadline).toLocaleDateString('es-CL')}  {selectedPoll.totalVotes} voto{selectedPoll.totalVotes === 1 ? '' : 's'}
+                                    </Text>
+                                    <Text style={s.pollDetailMeta}>
+                                        Tipo: {selectedPoll.allowMultiple ? 'Múltiple (varias respuestas)' : 'Única respuesta'}
+                                    </Text>
+                                    <View style={s.pollDetailList}>
+                                        {selectedPoll.options.map((option) => {
+                                            const pct = selectedPoll.totalVotes > 0
+                                                ? Math.round((option.votes / selectedPoll.totalVotes) * 100)
+                                                : 0;
+                                            return (
+                                                <View key={option.id} style={s.pollDetailItem}>
+                                                    <Text style={s.pollDetailItemText}>{option.text}</Text>
+                                                    <Text style={s.pollDetailItemVotes}>
+                                                        {option.votes} voto{option.votes === 1 ? '' : 's'} ({pct}%)
+                                                    </Text>
+                                                </View>
+                                            );
+                                        })}
+                                    </View>
+                                    <View style={s.pollDetailActions}>
+                                        <TouchableOpacity
+                                            style={s.pollDetailEditButton}
+                                            onPress={() => {
+                                                startEditPoll(selectedPoll);
+                                                setSelectedPoll(null);
+                                            }}
+                                        >
+                                            <Text style={s.pollDetailEditText}>Editar encuesta</Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity style={s.modalCloseOnlyButton} onPress={() => setSelectedPoll(null)}>
+                                            <Text style={s.modalCloseOnlyText}>Cerrar</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </ScrollView>
+                            )}
+                        </View>
+                    </TouchableOpacity>
+                </Modal>
 
                 <Modal visible={showYearPicker} transparent animationType="fade">
                     <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => setShowYearPicker(false)}>
@@ -751,6 +846,8 @@ const s = StyleSheet.create({
     card: { backgroundColor: '#FFFFFF', borderRadius: 12, padding: 14, marginBottom: 10, elevation: 1 },
     cardTitle: { fontSize: 15, fontWeight: 'bold', color: '#0F172A' },
     cardMeta: { fontSize: 12, color: '#3B82F6', marginTop: 4, fontWeight: '500' },
+    pollSummary: { marginTop: 8 },
+    pollSummaryOption: { fontSize: 12, color: '#64748B', marginBottom: 2 },
     cardBody: { fontSize: 13, color: '#64748B', marginTop: 4 },
     expiryText: { fontSize: 11, color: '#F59E0B', marginTop: 4 },
     cardFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 },
@@ -774,6 +871,33 @@ const s = StyleSheet.create({
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 24 },
     modalContent: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 20, width: '100%', maxWidth: 300 },
     modalTitle: { fontSize: 20, fontWeight: 'bold', color: '#1E3A5F', marginBottom: 16, textAlign: 'center' },
+    pollDetailQuestion: { fontSize: 18, fontWeight: '700', color: '#0F172A', marginBottom: 10 },
+    pollDetailMeta: { fontSize: 13, color: '#475569', marginBottom: 6 },
+    pollDetailList: { marginTop: 10, marginBottom: 14, gap: 8 },
+    pollDetailItem: {
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        borderRadius: 10,
+        padding: 10,
+        backgroundColor: '#F8FAFC',
+    },
+    pollDetailItemText: { fontSize: 14, color: '#0F172A', fontWeight: '600' },
+    pollDetailItemVotes: { fontSize: 12, color: '#64748B', marginTop: 3 },
+    pollDetailActions: { gap: 8 },
+    pollDetailEditButton: {
+        backgroundColor: '#2563EB',
+        borderRadius: 10,
+        paddingVertical: 12,
+        alignItems: 'center',
+    },
+    pollDetailEditText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
+    modalCloseOnlyButton: {
+        backgroundColor: '#F1F5F9',
+        borderRadius: 10,
+        paddingVertical: 12,
+        alignItems: 'center',
+    },
+    modalCloseOnlyText: { color: '#334155', fontSize: 14, fontWeight: '600' },
     yearList: { maxHeight: 350 },
     yearOption: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
     yearOptionActive: { backgroundColor: '#EFF6FF', borderRadius: 8, paddingHorizontal: 8 },
@@ -781,3 +905,7 @@ const s = StyleSheet.create({
     yearOptionTextActive: { fontWeight: 'bold', color: '#2563EB' },
     yearCheck: { fontSize: 12, color: '#2563EB', fontWeight: 'bold' },
 });
+
+
+
+

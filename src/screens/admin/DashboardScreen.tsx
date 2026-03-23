@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -28,9 +28,10 @@ export default function DashboardScreen() {
     const handlePress = (stat: typeof stats[0]) => {
         if (stat.screen) {
             navigation.navigate(stat.tab, { screen: stat.screen });
-        } else {
-            navigation.navigate(stat.tab);
+            return;
         }
+
+        navigation.navigate(stat.tab);
     };
 
     return (
@@ -50,10 +51,15 @@ export default function DashboardScreen() {
 
                 <Text style={s.section}>Accesos rápidos</Text>
                 <View style={s.grid}>
-                    {stats.map((stat, i) => (
-                        <TouchableOpacity key={i} style={[s.card, { backgroundColor: stat.color }]} onPress={() => handlePress(stat)} activeOpacity={0.7}>
+                    {stats.map((stat, index) => (
+                        <TouchableOpacity
+                            key={`${stat.label}-${index}`}
+                            style={[s.card, { backgroundColor: stat.color }]}
+                            onPress={() => handlePress(stat)}
+                            activeOpacity={0.7}
+                        >
                             <Text style={s.cardIcon}>{stat.icon}</Text>
-                            <Text style={s.cardLabel}>{stat.label}</Text>
+                            <Text style={s.cardLabel} numberOfLines={1} ellipsizeMode="tail">{stat.label}</Text>
                         </TouchableOpacity>
                     ))}
                 </View>
@@ -72,6 +78,6 @@ const s = StyleSheet.create({
     section: { fontSize: 18, fontWeight: 'bold', color: '#334155', marginBottom: 12 },
     grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 24 },
     card: { width: '31%', borderRadius: 14, paddingVertical: 14, paddingHorizontal: 6, alignItems: 'center', marginBottom: 10, elevation: 2 },
-    cardIcon: { fontSize: 26, marginBottom: 4 },
-    cardLabel: { fontSize: 12, fontWeight: '600', color: '#334155', textAlign: 'center' },
+    cardIcon: { fontSize: 26, marginBottom: 4, lineHeight: 30 },
+    cardLabel: { fontSize: 11.5, fontWeight: '600', color: '#334155', textAlign: 'center', width: '100%' },
 });

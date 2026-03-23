@@ -1,31 +1,99 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
-import { useAppStore } from '../../lib/store';
 import { pushService } from '../../services/pushService';
+import { organizationService, OrganizationRecord } from '../../services/organizationService';
 
 export default function AdminSettingsScreen({ navigation }: any) {
-    const { signOut, setViewMode, role, user, organizationId } = useAuth();
-    const orgSettings = useAppStore((state) => state.orgSettings);
-    const updateOrgSettings = useAppStore((state) => state.updateOrgSettings);
+    const { signOut, setViewMode, role, user, organizationId, refreshSession } = useAuth();
 
-    const [name, setName] = useState(orgSettings.name);
-    const [address, setAddress] = useState(orgSettings.address);
-    const [phone, setPhone] = useState(orgSettings.phone);
-    const [social, setSocial] = useState(orgSettings.social);
+    const [organizationSnapshot, setOrganizationSnapshot] = useState<OrganizationRecord | null>(null);
+    const [name, setName] = useState('');
+    const [region, setRegion] = useState('');
+    const [commune, setCommune] = useState('');
+    const [address, setAddress] = useState('');
+    const [phone, setPhone] = useState('');
+    const [email, setEmail] = useState('');
     const [editing, setEditing] = useState(false);
+    const [loadingOrganization, setLoadingOrganization] = useState(false);
+    const [saving, setSaving] = useState(false);
 
-    const handleSave = () => {
-        updateOrgSettings({ name, address, phone, social });
+    const applyOrganizationForm = (record: OrganizationRecord | null) => {
+        setName(record?.name || '');
+        setRegion(record?.region || '');
+        setCommune(record?.commune || '');
+        setAddress(record?.address || '');
+        setPhone(record?.phone || '');
+        setEmail(record?.email || '');
+    };
+
+    const loadOrganization = useCallback(async () => {
+        if (!organizationId) {
+            setOrganizationSnapshot(null);
+            applyOrganizationForm(null);
+            return;
+        }
+
+        setLoadingOrganization(true);
+        try {
+            const row = await organizationService.getOrganizationById(organizationId);
+            setOrganizationSnapshot(row);
+            applyOrganizationForm(row);
+        } catch (error: any) {
+            Alert.alert('Error', error?.message || 'No se pudo cargar la información de la organización.');
+        } finally {
+            setLoadingOrganization(false);
+        }
+    }, [organizationId]);
+
+    useEffect(() => {
+        void loadOrganization();
+    }, [loadOrganization]);
+
+    const handleSave = async () => {
+        if (!organizationId) {
+            Alert.alert('No disponible', 'No hay una organización activa para actualizar.');
+            return;
+        }
+
+        if (!name.trim()) {
+            Alert.alert('Dato requerido', 'El nombre de la organización es obligatorio.');
+            return;
+        }
+
+        setSaving(true);
+        try {
+            const updated = await organizationService.updateOrganization(organizationId, {
+                name,
+                region,
+                commune,
+                address,
+                phone,
+                email,
+            });
+
+            setOrganizationSnapshot(updated);
+            applyOrganizationForm(updated);
+            setEditing(false);
+            await refreshSession();
+            Alert.alert('Guardado', 'La información de la organización se actualizó correctamente.');
+        } catch (error: any) {
+            Alert.alert('Error', error?.message || 'No se pudo guardar la información.');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleCancel = () => {
         setEditing(false);
-        Alert.alert('Guardado', 'La configuracion se actualizo correctamente.');
+        applyOrganizationForm(organizationSnapshot);
     };
 
     const sendTestNotification = async () => {
         try {
             if (!user?.id || !organizationId) {
-                Alert.alert('No disponible', 'Necesitas una organizacion activa para probar notificaciones.');
+                Alert.alert('No disponible', 'Necesitas una organización activa para probar notificaciones.');
                 return;
             }
 
@@ -46,9 +114,30 @@ export default function AdminSettingsScreen({ navigation }: any) {
 
             Alert.alert('Push enviada', result.message);
         } catch (error: any) {
-            Alert.alert('Error', 'Fallo el envio de la notificacion de prueba.\n' + (error?.message || 'Error desconocido'));
+            Alert.alert('Error', `Falló el envío de la notificación de prueba.\n${error?.message || 'Error desconocido'}`);
         }
     };
+
+    const renderField = (
+        label: string,
+        value: string,
+        onChangeText: (value: string) => void,
+        placeholder: string,
+        keyboardType: 'default' | 'phone-pad' | 'email-address' = 'default',
+    ) => (
+        <View style={s.card}>
+            <Text style={s.label}>{label}</Text>
+            <TextInput
+                style={s.input}
+                value={value}
+                onChangeText={onChangeText}
+                editable={editing && !saving}
+                placeholder={placeholder}
+                keyboardType={keyboardType}
+                autoCapitalize={keyboardType === 'email-address' ? 'none' : 'sentences'}
+            />
+        </View>
+    );
 
     return (
         <SafeAreaView style={s.safe}>
@@ -56,57 +145,45 @@ export default function AdminSettingsScreen({ navigation }: any) {
                 <TouchableOpacity onPress={() => navigation.goBack()} style={s.back}>
                     <Text style={s.backText}>Volver</Text>
                 </TouchableOpacity>
-                <Text style={s.title}>Configuracion JJVV</Text>
-                <Text style={s.subtitle}>Administra la informacion de tu organizacion</Text>
 
-                <View style={s.card}>
-                    <Text style={s.label}>Nombre de la organizacion</Text>
-                    <TextInput style={s.input} value={name} onChangeText={setName} editable={editing} placeholder="Nombre JJVV" />
-                </View>
+                <Text style={s.title}>Configuración JJVV</Text>
+                <Text style={s.subtitle}>Administra los datos de tu organización activa</Text>
 
-                <View style={s.card}>
-                    <Text style={s.label}>Direccion</Text>
-                    <TextInput style={s.input} value={address} onChangeText={setAddress} editable={editing} placeholder="Direccion de la sede" />
-                </View>
-
-                <View style={s.card}>
-                    <Text style={s.label}>Telefono de contacto</Text>
-                    <TextInput style={s.input} value={phone} onChangeText={setPhone} editable={editing} placeholder="Ej: +56 9 1234 5678" keyboardType="phone-pad" />
-                </View>
-
-                <View style={s.card}>
-                    <Text style={s.label}>Redes sociales / Web</Text>
-                    <TextInput style={s.input} value={social} onChangeText={setSocial} editable={editing} placeholder="Instagram, Facebook, etc." />
-                </View>
-
-                {editing ? (
-                    <View style={s.btnRow}>
-                        <TouchableOpacity style={s.saveBtn} onPress={handleSave}>
-                            <Text style={s.saveBtnText}>Guardar cambios</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={s.cancelBtn}
-                            onPress={() => {
-                                setEditing(false);
-                                setName(orgSettings.name);
-                                setAddress(orgSettings.address);
-                                setPhone(orgSettings.phone);
-                                setSocial(orgSettings.social);
-                            }}
-                        >
-                            <Text style={s.cancelBtnText}>Cancelar</Text>
-                        </TouchableOpacity>
+                {loadingOrganization ? (
+                    <View style={s.loadingCard}>
+                        <ActivityIndicator size="large" color="#1E3A5F" />
+                        <Text style={s.loadingText}>Cargando información de la organización...</Text>
                     </View>
                 ) : (
-                    <TouchableOpacity style={s.editBtn} onPress={() => setEditing(true)}>
-                        <Text style={s.editBtnText}>Editar informacion</Text>
-                    </TouchableOpacity>
+                    <>
+                        {renderField('Nombre de la organización', name, setName, 'Nombre JJVV')}
+                        {renderField('Región', region, setRegion, 'Región')}
+                        {renderField('Comuna', commune, setCommune, 'Comuna')}
+                        {renderField('Dirección', address, setAddress, 'Dirección de la sede')}
+                        {renderField('Teléfono de contacto', phone, setPhone, 'Ej: +56 9 1234 5678', 'phone-pad')}
+                        {renderField('Correo institucional', email, setEmail, 'organizacion@email.com', 'email-address')}
+
+                        {editing ? (
+                            <View style={s.btnRow}>
+                                <TouchableOpacity style={[s.saveBtn, saving && s.btnDisabled]} onPress={handleSave} disabled={saving}>
+                                    <Text style={s.saveBtnText}>{saving ? 'Guardando...' : 'Guardar cambios'}</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={s.cancelBtn} onPress={handleCancel} disabled={saving}>
+                                    <Text style={s.cancelBtnText}>Cancelar</Text>
+                                </TouchableOpacity>
+                            </View>
+                        ) : (
+                            <TouchableOpacity style={s.editBtn} onPress={() => setEditing(true)}>
+                                <Text style={s.editBtnText}>Editar información</Text>
+                            </TouchableOpacity>
+                        )}
+                    </>
                 )}
 
                 <View style={s.divider} />
 
                 <TouchableOpacity style={s.testPushBtn} onPress={sendTestNotification}>
-                    <Text style={s.testPushText}>Enviar notificacion push de prueba</Text>
+                    <Text style={s.testPushText}>Enviar notificación push de prueba</Text>
                 </TouchableOpacity>
 
                 {role === 'superadmin' && (
@@ -120,13 +197,13 @@ export default function AdminSettingsScreen({ navigation }: any) {
                 <TouchableOpacity
                     style={s.logoutBtn}
                     onPress={() =>
-                        Alert.alert('Cerrar sesion', 'Estas seguro?', [
+                        Alert.alert('Cerrar sesión', '¿Estás seguro?', [
                             { text: 'Cancelar' },
-                            { text: 'Cerrar sesion', style: 'destructive', onPress: signOut },
+                            { text: 'Cerrar sesión', style: 'destructive', onPress: signOut },
                         ])
                     }
                 >
-                    <Text style={s.logoutText}>Cerrar sesion</Text>
+                    <Text style={s.logoutText}>Cerrar sesión</Text>
                 </TouchableOpacity>
             </ScrollView>
         </SafeAreaView>
@@ -140,6 +217,15 @@ const s = StyleSheet.create({
     backText: { color: '#2563EB', fontSize: 16, fontWeight: '600' },
     title: { fontSize: 24, fontWeight: 'bold', color: '#1E3A5F', marginBottom: 4 },
     subtitle: { fontSize: 14, color: '#64748B', marginBottom: 20 },
+    loadingCard: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 12,
+        padding: 20,
+        alignItems: 'center',
+        elevation: 1,
+        marginBottom: 10,
+    },
+    loadingText: { marginTop: 12, color: '#475569', fontSize: 14 },
     card: { backgroundColor: '#FFFFFF', borderRadius: 12, padding: 16, marginBottom: 10, elevation: 1 },
     label: { fontSize: 12, color: '#94A3B8', fontWeight: '600', textTransform: 'uppercase', marginBottom: 8 },
     input: {
@@ -154,6 +240,7 @@ const s = StyleSheet.create({
     },
     btnRow: { gap: 8, marginTop: 16 },
     saveBtn: { backgroundColor: '#22C55E', borderRadius: 12, padding: 16, alignItems: 'center' },
+    btnDisabled: { opacity: 0.7 },
     saveBtnText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 16 },
     cancelBtn: { alignItems: 'center', padding: 12 },
     cancelBtnText: { color: '#94A3B8', fontSize: 14 },
@@ -193,3 +280,4 @@ const s = StyleSheet.create({
     },
     logoutText: { color: '#DC2626', fontWeight: 'bold', fontSize: 16 },
 });
+

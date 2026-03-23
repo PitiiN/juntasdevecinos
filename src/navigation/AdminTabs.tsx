@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { View, Text, StyleSheet } from 'react-native';
@@ -18,17 +18,29 @@ const SolStack = createNativeStackNavigator();
 function BadgeIcon({ emoji, count }: { emoji: string; count: number }) {
     return (
         <View style={{ position: 'relative' }}>
-            <Text style={{ fontSize: 22 }}>{emoji}</Text>
+            <Text style={s.tabIcon}>{emoji}</Text>
             {count > 0 && (
-                <View style={b.badge}><Text style={b.badgeText}>{count > 9 ? '9+' : count}</Text></View>
+                <View style={s.badge}><Text style={s.badgeText}>{count > 9 ? '9+' : count}</Text></View>
             )}
         </View>
     );
 }
 
-const b = StyleSheet.create({
-    badge: { position: 'absolute', top: -4, right: -10, backgroundColor: '#EF4444', borderRadius: 9, minWidth: 18, height: 18, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 4 },
+const s = StyleSheet.create({
+    badge: {
+        position: 'absolute',
+        top: -4,
+        right: -10,
+        backgroundColor: '#EF4444',
+        borderRadius: 9,
+        minWidth: 18,
+        height: 18,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 4,
+    },
     badgeText: { color: '#FFFFFF', fontSize: 10, fontWeight: 'bold' },
+    tabIcon: { fontSize: 22, lineHeight: 24, includeFontPadding: false },
 });
 
 function SolicitudesStack() {
@@ -47,22 +59,31 @@ export default function AdminTabs() {
 
     return (
         <Tab.Navigator
+            backBehavior="history"
             screenOptions={{
                 headerShown: false,
-                tabBarStyle: { backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#E2E8F0', height: 56 + insets.bottom, paddingBottom: insets.bottom, paddingTop: 6 },
+                tabBarStyle: {
+                    backgroundColor: '#FFFFFF',
+                    borderTopWidth: 1,
+                    borderTopColor: '#E2E8F0',
+                    height: 64 + insets.bottom,
+                    paddingBottom: Math.max(insets.bottom, 6),
+                    paddingTop: 8,
+                },
+                tabBarItemStyle: { paddingVertical: 2 },
                 tabBarActiveTintColor: '#7C3AED',
                 tabBarInactiveTintColor: '#94A3B8',
-                tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
+                tabBarLabelStyle: { fontSize: 11, fontWeight: '600', marginBottom: 1 },
             }}
         >
-            <Tab.Screen name="Panel" component={DashboardScreen} options={{ tabBarIcon: () => <Text style={{ fontSize: 22 }}>📊</Text> }} />
-            <Tab.Screen name="Avisos" component={ManageAnnouncementsScreen} options={{ tabBarIcon: () => <Text style={{ fontSize: 22 }}>📢</Text> }} />
+            <Tab.Screen name="Panel" component={DashboardScreen} options={{ tabBarIcon: () => <Text style={s.tabIcon}>📊</Text> }} />
+            <Tab.Screen name="Avisos" component={ManageAnnouncementsScreen} options={{ tabBarIcon: () => <Text style={s.tabIcon}>📢</Text> }} />
             <Tab.Screen name="Solicitudes" component={SolicitudesStack} options={{ tabBarIcon: () => <BadgeIcon emoji="📝" count={unreadSol} /> }} />
-            <Tab.Screen name="Docs" component={AdminDocumentsScreen} options={{ tabBarIcon: () => <Text style={{ fontSize: 22 }}>📁</Text> }} />
+            <Tab.Screen name="Docs" component={AdminDocumentsScreen} options={{ tabBarIcon: () => <Text style={s.tabIcon}>📁</Text> }} />
             <Tab.Screen
                 name="Admin"
                 component={AdminMoreStack}
-                options={{ tabBarIcon: () => <Text style={{ fontSize: 22 }}>⚙️</Text> }}
+                options={{ tabBarIcon: () => <Text style={s.tabIcon}>⚙️</Text> }}
                 listeners={({ navigation }) => ({
                     tabPress: (e) => {
                         e.preventDefault();

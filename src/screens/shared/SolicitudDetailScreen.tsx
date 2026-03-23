@@ -1,5 +1,17 @@
-import React, { useCallback, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, TextInput, Alert, ActivityIndicator } from 'react-native';
+﻿import React, { useCallback, useState } from 'react';
+import {
+    View,
+    Text,
+    StyleSheet,
+    ScrollView,
+    TouchableOpacity,
+    Image,
+    TextInput,
+    Alert,
+    ActivityIndicator,
+    KeyboardAvoidingView,
+    Platform,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { poiService } from '../../services/poiService';
@@ -173,90 +185,100 @@ export default function SolicitudDetailScreen({ route, navigation }: any) {
 
     return (
         <SafeAreaView style={s.safe}>
-            <ScrollView contentContainerStyle={s.scroll}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={s.back}>
-                    <Text style={s.backText}>← Volver</Text>
-                </TouchableOpacity>
-
-                <View style={[s.header, { marginBottom: 4 }]}>
-                    <Text style={s.trackingCode}>#{ticket.trackingCode}</Text>
-                </View>
-
-                <View style={s.header}>
-                    <Text style={s.title}>{ticket.title}</Text>
-                    <View style={[s.badge, { backgroundColor: getStatusColor(ticket.status) }]}>
-                        <Text style={s.badgeText}>{ticket.status}</Text>
-                    </View>
-                </View>
-
-                <View style={s.infoRow}>
-                    <Text style={s.info}>👤 {ticket.reporterName}</Text>
-                    <Text style={s.info}>📅 {ticket.createdDateLabel}</Text>
-                </View>
-
-                <View style={s.descCard}>
-                    <Text style={s.descLabel}>Descripción</Text>
-                    <Text style={s.descText}>{ticket.description}</Text>
-                </View>
-
-                {ticket.attachmentUrl && (
-                    <View style={s.imageContainer}>
-                        <Text style={s.descLabel}>📷 Imagen adjunta</Text>
-                        <Image source={{ uri: ticket.attachmentUrl }} style={s.image} resizeMode="cover" />
-                    </View>
-                )}
-
-                {isAdminContext && (
-                    <TouchableOpacity style={s.statusBtn} onPress={handleChangeStatus}>
-                        <Text style={s.statusBtnText}>🔄 Cambiar Estado</Text>
+            <KeyboardAvoidingView
+                style={s.safe}
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                keyboardVerticalOffset={8}
+            >
+                <ScrollView
+                    contentContainerStyle={s.scroll}
+                    keyboardShouldPersistTaps="handled"
+                    keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+                >
+                    <TouchableOpacity onPress={() => navigation.goBack()} style={s.back}>
+                        <Text style={s.backText}>← Volver</Text>
                     </TouchableOpacity>
-                )}
 
-                {isAdminContext && (ticket.title.startsWith('PIN:') || ticket.title.startsWith('📍 Pin:')) && !isClosed && (
-                    <TouchableOpacity style={s.pinBtn} onPress={() => void approveMapPin()}>
-                        <Text style={s.pinBtnText}>✅ Aprobar Pin y Marcar Resuelta</Text>
-                    </TouchableOpacity>
-                )}
-
-                {isAdminContext
-                    && ['Servicio', 'Oficio', 'Emprendimiento', 'Servicio/Oficio/Emprendimiento'].some((value) => ticket.category.includes(value))
-                    && !ticket.title.startsWith('PIN:') && !ticket.title.startsWith('📍 Pin:') && (
-                    <TouchableOpacity style={s.pinBtn} onPress={() => void addServicePin()}>
-                        <Text style={s.pinBtnText}>📍 Agregar como Pin al Mapa</Text>
-                    </TouchableOpacity>
-                )}
-
-                <Text style={s.sectionTitle}>💬 Conversación</Text>
-                {comments.length === 0 ? (
-                    <Text style={s.noReplies}>No hay mensajes aún</Text>
-                ) : comments.map((comment) => (
-                    <View key={comment.id} style={[s.replyCard, comment.from === 'admin' ? s.replyAdmin : s.replyUser]}>
-                        <Text style={s.replyFrom}>{comment.from === 'admin' ? '👑 Administración' : '👤 Vecino'}</Text>
-                        <Text style={s.replyMsg}>{comment.body}</Text>
-                        <Text style={s.replyDate}>{comment.createdDateLabel}</Text>
+                    <View style={[s.header, { marginBottom: 4 }]}>
+                        <Text style={s.trackingCode}>#{ticket.trackingCode}</Text>
                     </View>
-                ))}
 
-                {isClosed ? (
-                    <View style={s.closedBox}>
-                        <Text style={s.closedText}>🔒 Esta solicitud está {ticket.status.toLowerCase()} y no admite más mensajes.</Text>
+                    <View style={s.header}>
+                        <Text style={s.title}>{ticket.title}</Text>
+                        <View style={[s.badge, { backgroundColor: getStatusColor(ticket.status) }]}>
+                            <Text style={s.badgeText}>{ticket.status}</Text>
+                        </View>
                     </View>
-                ) : (
-                    <View style={s.replyBox}>
-                        <TextInput
-                            style={s.replyInput}
-                            placeholder="Escribe una respuesta..."
-                            placeholderTextColor="#94A3B8"
-                            value={reply}
-                            onChangeText={setReply}
-                            multiline
-                        />
-                        <TouchableOpacity style={s.sendBtn} onPress={() => void handleSendReply()} disabled={sending}>
-                            <Text style={s.sendText}>{sending ? '…' : '➤'}</Text>
+
+                    <View style={s.infoRow}>
+                        <Text style={s.info}>👤 {ticket.reporterName}</Text>
+                        <Text style={s.info}>📅 {ticket.createdDateLabel}</Text>
+                    </View>
+
+                    <View style={s.descCard}>
+                        <Text style={s.descLabel}>Descripción</Text>
+                        <Text style={s.descText}>{ticket.description}</Text>
+                    </View>
+
+                    {ticket.attachmentUrl && (
+                        <View style={s.imageContainer}>
+                            <Text style={s.descLabel}>📷 Imagen adjunta</Text>
+                            <Image source={{ uri: ticket.attachmentUrl }} style={s.image} resizeMode="cover" />
+                        </View>
+                    )}
+
+                    {isAdminContext && (
+                        <TouchableOpacity style={s.statusBtn} onPress={handleChangeStatus}>
+                            <Text style={s.statusBtnText}>🔄 Cambiar estado</Text>
                         </TouchableOpacity>
-                    </View>
-                )}
-            </ScrollView>
+                    )}
+
+                    {isAdminContext && (ticket.title.startsWith('PIN:') || ticket.title.startsWith('📍 Pin:')) && !isClosed && (
+                        <TouchableOpacity style={s.pinBtn} onPress={() => void approveMapPin()}>
+                            <Text style={s.pinBtnText}>✅ Aprobar pin y marcar resuelta</Text>
+                        </TouchableOpacity>
+                    )}
+
+                    {isAdminContext
+                        && ['Servicio', 'Oficio', 'Emprendimiento', 'Servicio/Oficio/Emprendimiento'].some((value) => ticket.category.includes(value))
+                        && !ticket.title.startsWith('PIN:') && !ticket.title.startsWith('📍 Pin:') && (
+                        <TouchableOpacity style={s.pinBtn} onPress={() => void addServicePin()}>
+                            <Text style={s.pinBtnText}>📍 Agregar como pin al mapa</Text>
+                        </TouchableOpacity>
+                    )}
+
+                    <Text style={s.sectionTitle}>💬 Conversación</Text>
+                    {comments.length === 0 ? (
+                        <Text style={s.noReplies}>No hay mensajes aún.</Text>
+                    ) : comments.map((comment) => (
+                        <View key={comment.id} style={[s.replyCard, comment.from === 'admin' ? s.replyAdmin : s.replyUser]}>
+                            <Text style={s.replyFrom}>{comment.from === 'admin' ? '🧑‍💼 Administración' : '👤 Vecino'}</Text>
+                            <Text style={s.replyMsg}>{comment.body}</Text>
+                            <Text style={s.replyDate}>{comment.createdDateLabel}</Text>
+                        </View>
+                    ))}
+
+                    {isClosed ? (
+                        <View style={s.closedBox}>
+                            <Text style={s.closedText}>🔒 Esta solicitud está {ticket.status.toLowerCase()} y no admite más mensajes.</Text>
+                        </View>
+                    ) : (
+                        <View style={s.replyBox}>
+                            <TextInput
+                                style={s.replyInput}
+                                placeholder="Escribe una respuesta..."
+                                placeholderTextColor="#94A3B8"
+                                value={reply}
+                                onChangeText={setReply}
+                                multiline
+                            />
+                            <TouchableOpacity style={s.sendBtn} onPress={() => void handleSendReply()} disabled={sending}>
+                                <Text style={s.sendText}>{sending ? '...' : '➤'}</Text>
+                            </TouchableOpacity>
+                        </View>
+                    )}
+                </ScrollView>
+            </KeyboardAvoidingView>
         </SafeAreaView>
     );
 }
@@ -316,7 +338,7 @@ const s = StyleSheet.create({
         maxHeight: 100,
     },
     sendBtn: { backgroundColor: '#2563EB', borderRadius: 12, width: 48, height: 48, justifyContent: 'center', alignItems: 'center' },
-    sendText: { fontSize: 22, color: '#FFFFFF' },
+    sendText: { fontSize: 20, color: '#FFFFFF', fontWeight: '700' },
     pinBtn: { backgroundColor: '#7C3AED', borderRadius: 12, padding: 14, alignItems: 'center', marginBottom: 12 },
     pinBtnText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 15 },
     closedBox: {

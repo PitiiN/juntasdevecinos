@@ -62,6 +62,7 @@ const defaultValue: AuthContextType = {
 };
 
 const AuthContext = createContext<AuthContextType>(defaultValue);
+const retryDelayMs = 700;
 
 const emptyOrganizationState = {
     role: null as Role | null,
@@ -84,6 +85,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const [isLoading, setIsLoading] = useState(true);
     const [viewMode, setViewMode] = useState<ViewMode>('user');
     const selectedOrganizationIdRef = useRef<string | null>(null);
+    const pendingAccessRefreshInFlightRef = useRef(false);
 
     const isSuperadminUser = (user?.email || '').toLowerCase() === GLOBAL_SUPERADMIN_EMAIL;
     const isAdmin = isAdminRole(role) || isSuperadminUser;
@@ -107,6 +109,40 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setOrganizationName(nextOrganization.organizationName);
         setOrganizationLogoUrl(nextOrganization.organizationLogoUrl);
         setDirectivaImageUrl(nextOrganization.organizationDirectivaImageUrl);
+    };
+
+    const pause = (milliseconds: number) =>
+        new Promise((resolve) => {
+            setTimeout(resolve, milliseconds);
+        });
+
+    const listAccessibleOrganizations = async (userId: string): Promise<AccessibleOrganization[]> => {
+        const organizationResult = await supabase.rpc('list_accessible_organizations');
+        let organizations = organizationResult.error
+            ? []
+            : (((organizationResult.data as any[]) || [])
+                .map((item) => ({
+                    organizationId: item.organization_id,
+                    role: item.role as Role,
+                    organizationName: item.organization_name ?? null,
+                    organizationLogoUrl: item.organization_logo_url ?? null,
+                    organizationDirectivaImageUrl: item.organization_directiva_image_url ?? null,
+                }))
+                .filter((item) => !isInternalAuditOrganization(item.organizationName)));
+
+        if (organizationResult.error) {
+            console.warn('Error fetching membership context, using fallback:', organizationResult.error.message);
+        }
+
+        if (organizations.length === 0) {
+            try {
+                organizations = await loadMembershipFallback(userId);
+            } catch (fallbackError: any) {
+                console.warn('Fallback membership lookup failed:', fallbackError?.message || fallbackError);
+            }
+        }
+
+        return organizations;
     };
 
     const loadMembershipFallback = async (userId: string) => {
@@ -139,10 +175,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     const fetchMembershipData = async (userId: string, email?: string | null) => {
         try {
-            const [organizationResult, requestResult] = await Promise.all([
-                supabase.rpc('list_accessible_organizations'),
-                supabase.rpc('get_my_membership_request'),
-            ]);
+            const requestResult = await supabase.rpc('get_my_membership_request');
 
             if (requestResult.error) {
                 console.warn('Error fetching membership request:', requestResult.error.message);
@@ -153,7 +186,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                     ? {
                         id: requestRows[0].id,
                         organizationId: requestRows[0].organization_id,
-                        organizationName: requestRows[0].organization_name || 'Organizacion',
+                        organizationName: requestRows[0].organization_name || 'Organización',
                         requestedEmail: requestRows[0].requested_email || '',
                         requestedFullName: requestRows[0].requested_full_name || null,
                         status: requestRows[0].status,
@@ -166,28 +199,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                 setPendingMembershipRequest(latestRequest && latestRequest.status !== 'approved' ? latestRequest : null);
             }
 
-            let organizations = organizationResult.error
-                ? []
-                : (((organizationResult.data as any[]) || [])
-                    .map((item) => ({
-                        organizationId: item.organization_id,
-                        role: item.role as Role,
-                        organizationName: item.organization_name ?? null,
-                        organizationLogoUrl: item.organization_logo_url ?? null,
-                        organizationDirectivaImageUrl: item.organization_directiva_image_url ?? null,
-                    }))
-                    .filter((item) => !isInternalAuditOrganization(item.organizationName)));
-
-            if (organizationResult.error) {
-                console.warn('Error fetching membership context, using fallback:', organizationResult.error.message);
-            }
-
+            let organizations = await listAccessibleOrganizations(userId);
             if (organizations.length === 0) {
-                try {
-                    organizations = await loadMembershipFallback(userId);
-                } catch (fallbackError: any) {
-                    console.warn('Fallback membership lookup failed:', fallbackError?.message || fallbackError);
-                }
+                await pause(retryDelayMs);
+                organizations = await listAccessibleOrganizations(userId);
             }
 
             setAccessibleOrganizations(organizations);
@@ -263,13 +278,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }, [isAdmin, isSuperadmin, viewMode]);
 
     useEffect(() => {
-        void refreshSession();
+        let cancelled = false;
+        let authSubscription: { unsubscribe: () => void } | null = null;
 
-        const timeout = setTimeout(() => {
-            setIsLoading(false);
-        }, 5000);
-
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
+        const handleSessionChange = async (newSession: Session | null) => {
+            setIsLoading(true);
             setSession(newSession);
             setUser(newSession?.user || null);
 
@@ -283,14 +296,78 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                 setViewMode('user');
             }
 
-            setIsLoading(false);
-        });
+            if (!cancelled) {
+                setIsLoading(false);
+            }
+        };
+
+        const bootstrapAuth = async () => {
+            await refreshSession();
+            if (cancelled) {
+                return;
+            }
+
+            const { data: { subscription } } = supabase.auth.onAuthStateChange((event, newSession) => {
+                if (cancelled) {
+                    return;
+                }
+
+                if (event === 'INITIAL_SESSION') {
+                    return;
+                }
+
+                if (event === 'TOKEN_REFRESHED') {
+                    setSession(newSession);
+                    setUser(newSession?.user || null);
+                    return;
+                }
+
+                void handleSessionChange(newSession);
+            });
+
+            authSubscription = subscription;
+        };
+
+        void bootstrapAuth();
 
         return () => {
-            clearTimeout(timeout);
-            subscription.unsubscribe();
+            cancelled = true;
+            authSubscription?.unsubscribe();
         };
     }, []);
+
+    useEffect(() => {
+        if (!session?.user?.id || hasApprovedAccess) {
+            return;
+        }
+
+        let cancelled = false;
+
+        const refreshPendingAccess = async () => {
+            if (pendingAccessRefreshInFlightRef.current || cancelled) {
+                return;
+            }
+
+            pendingAccessRefreshInFlightRef.current = true;
+            try {
+                await fetchMembershipData(session.user.id, session.user.email);
+            } catch (error) {
+                console.warn('Pending-access refresh skipped:', (error as any)?.message || error);
+            } finally {
+                pendingAccessRefreshInFlightRef.current = false;
+            }
+        };
+
+        void refreshPendingAccess();
+        const intervalId = setInterval(() => {
+            void refreshPendingAccess();
+        }, 12000);
+
+        return () => {
+            cancelled = true;
+            clearInterval(intervalId);
+        };
+    }, [session?.user?.id, session?.user?.email, hasApprovedAccess]);
 
     useEffect(() => {
         if (!user?.id || !organizationId || !hasApprovedAccess) {
@@ -358,3 +435,4 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 };
 
 export const useAuth = () => useContext(AuthContext);
+

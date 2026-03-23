@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase';
+﻿import { supabase } from '../lib/supabase';
 import { isInternalAuditOrganization } from '../lib/constants';
 
 export type JoinableOrganization = {
@@ -36,7 +36,7 @@ export type OrganizationMembershipRequest = {
 const mapRequest = (row: any): MembershipRequestInfo => ({
     id: row.id,
     organizationId: row.organization_id,
-    organizationName: row.organization_name || 'Organizacion',
+    organizationName: row.organization_name || 'Organización',
     requestedEmail: row.requested_email || '',
     requestedFullName: row.requested_full_name || null,
     status: row.status,
@@ -120,3 +120,4 @@ export const accessRequestService = {
         if (error) throw error;
     },
 };
+

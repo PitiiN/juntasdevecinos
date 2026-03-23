@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase';
+﻿import { supabase } from '../lib/supabase';
 
 export type DeleteAccountResult = {
     success: boolean;
@@ -15,7 +15,7 @@ export const accountService = {
 
         const accessToken = sessionData.session?.access_token;
         if (!accessToken) {
-            throw new Error('No hay una sesion activa para eliminar la cuenta');
+            throw new Error('No hay una sesión activa para eliminar la cuenta');
         }
 
         const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
@@ -55,3 +55,4 @@ export const accountService = {
         return payload as DeleteAccountResult;
     },
 };
+

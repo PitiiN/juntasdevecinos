@@ -3,8 +3,9 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Modal,
 import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import MapView, { Marker } from 'react-native-maps';
-import { useAppStore } from '../../lib/store';
+import MapView from 'react-native-maps';
+import { CommonMap } from '../../components/CommonMap';
+import { useAppStore, MapPin } from '../../lib/store';
 import { useAuth } from '../../context/AuthContext';
 
 const MONTHS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
@@ -277,19 +278,17 @@ export default function EventsScreen() {
                             <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#1E3A5F', textAlign: 'center' }}>📍 Ubicación del Evento</Text>
                             <Text style={{ fontSize: 14, color: '#64748B', textAlign: 'center' }}>{mapLocation?.title}</Text>
                         </View>
-                        <MapView
-                            style={{ flex: 1, width: '100%' }}
-                            initialRegion={mapLocation ? {
-                                latitude: mapLocation.lat,
-                                longitude: mapLocation.lng,
-                                latitudeDelta: 0.005,
-                                longitudeDelta: 0.005,
-                            } : DEFAULT_REGION}
-                        >
-                            {mapLocation && (
-                                <Marker coordinate={{ latitude: mapLocation.lat, longitude: mapLocation.lng }} />
-                            )}
-                        </MapView>
+                        <CommonMap
+                            pins={mapLocation ? [{
+                                id: 'event-loc',
+                                title: mapLocation.title,
+                                lat: mapLocation.lat,
+                                lng: mapLocation.lng,
+                                emoji: '📍',
+                                category: 'punto_interes' as const,
+                                description: ''
+                            }] : []}
+                        />
                         <TouchableOpacity style={{ padding: 16, backgroundColor: '#F1F5F9', width: '100%' }} onPress={() => setShowMapModal(false)}>
                             <Text style={{ color: '#2563EB', fontWeight: 'bold', textAlign: 'center' }}>Cerrar Mapa</Text>
                         </TouchableOpacity>
@@ -305,23 +304,21 @@ export default function EventsScreen() {
                             <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#1E3A5F', textAlign: 'center' }}>Seleccionar Ubicación</Text>
                             <Text style={{ fontSize: 13, color: '#64748B', textAlign: 'center' }}>Toca el mapa para situar el pin del evento</Text>
                         </View>
-                        <MapView
-                            style={{ flex: 1, width: '100%' }}
-                            initialRegion={tempLat && tempLng ? {
-                                latitude: tempLat,
-                                longitude: tempLng,
-                                latitudeDelta: 0.005,
-                                longitudeDelta: 0.005,
-                            } : DEFAULT_REGION}
-                            onPress={(e) => {
-                                setTempLat(e.nativeEvent.coordinate.latitude);
-                                setTempLng(e.nativeEvent.coordinate.longitude);
+                        <CommonMap
+                            onMapPress={(lat, lng) => {
+                                setTempLat(lat);
+                                setTempLng(lng);
                             }}
-                        >
-                            {tempLat && tempLng && (
-                                <Marker coordinate={{ latitude: tempLat, longitude: tempLng }} />
-                            )}
-                        </MapView>
+                            pins={tempLat && tempLng ? [{
+                                id: 'picker-loc',
+                                title: 'Ubicación seleccionada',
+                                lat: tempLat,
+                                lng: tempLng,
+                                emoji: '📍',
+                                category: 'punto_interes' as const,
+                                description: ''
+                            }] : []}
+                        />
                         <View style={{ flexDirection: 'row', gap: 10, padding: 16 }}>
                             <TouchableOpacity style={[s.submitBtn, { flex: 1, backgroundColor: '#64748B' }]} onPress={() => setShowAdminMapPicker(false)}>
                                 <Text style={s.submitBtnText}>Confirmar</Text>

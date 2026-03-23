@@ -1,5 +1,5 @@
-import React, { useState, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Image } from 'react-native';
+﻿import React, { useState, useCallback } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, CommonActions, useFocusEffect } from '@react-navigation/native';
 import * as Speech from 'expo-speech';
@@ -11,11 +11,11 @@ import { useTicketCounters } from '../../hooks/useTicketCounters';
 export default function HomeScreen() {
     const { user, organizationId, organizationLogoUrl, organizationName } = useAuth();
     const navigation = useNavigation<any>();
-    const announcements = useAppStore(s => s.announcements);
-    const documents = useAppStore(s => s.documents);
-    const seenAvisosCount = useAppStore(s => s.seenAvisosCount);
-    const seenDocsCount = useAppStore(s => s.seenDocsCount);
-    const markAvisosSeen = useAppStore(s => s.markAvisosSeen);
+    const announcements = useAppStore((state) => state.announcements);
+    const documents = useAppStore((state) => state.documents);
+    const seenAvisosCount = useAppStore((state) => state.seenAvisosCount);
+    const seenDocsCount = useAppStore((state) => state.seenDocsCount);
+    const markAvisosSeen = useAppStore((state) => state.markAvisosSeen);
     const { ttsEnabled } = useAccessibility();
     const displayName = user?.user_metadata?.full_name || 'Vecino';
     const [speaking, setSpeaking] = useState<string | null>(null);
@@ -34,10 +34,11 @@ export default function HomeScreen() {
     );
 
     const goToTab = (tabName: string) => {
-        if (tabName === 'Avisos') markAvisosSeen();
-        navigation.dispatch(
-            CommonActions.navigate({ name: tabName, params: {} })
-        );
+        if (tabName === 'Avisos') {
+            markAvisosSeen();
+        }
+
+        navigation.dispatch(CommonActions.navigate({ name: tabName, params: {} }));
     };
 
     const quickActions = [
@@ -51,7 +52,7 @@ export default function HomeScreen() {
         { title: 'Emergencia', emoji: '🆘', bg: '#F1F5F9', badge: 0, onPress: () => goToTab('S.O.S') },
         { title: 'Documentos', emoji: '📁', bg: '#FFF7ED', badge: unreadDocs, onPress: () => navigation.navigate('Más', { screen: 'Documents' }) },
         { title: 'Directiva', emoji: '🏢', bg: '#F1F5F9', badge: 0, onPress: () => navigation.navigate('Más', { screen: 'Directiva' }) },
-        { title: 'Accesibilidad', emoji: '☉', bg: '#FFF7ED', badge: 0, onPress: () => navigation.navigate('Más', { screen: 'Accessibility' }) },
+        { title: 'Accesibilidad', emoji: '♿', bg: '#FFF7ED', badge: 0, onPress: () => navigation.navigate('Más', { screen: 'Accessibility' }) },
         { title: 'Perfil', emoji: '👤', bg: '#F1F5F9', badge: 0, onPress: () => navigation.navigate('Más', { screen: 'Profile' }) },
     ];
 
@@ -72,36 +73,57 @@ export default function HomeScreen() {
 
                 <Text style={s.section}>Accesos rápidos</Text>
                 <View style={s.grid}>
-                    {quickActions.map((action, i) => (
-                        <TouchableOpacity key={i} style={[s.card, { backgroundColor: action.bg }]} activeOpacity={0.7} onPress={action.onPress}>
+                    {quickActions.map((action, index) => (
+                        <TouchableOpacity
+                            key={`${action.title}-${index}`}
+                            style={[s.card, { backgroundColor: action.bg }]}
+                            activeOpacity={0.7}
+                            onPress={action.onPress}
+                        >
                             <View style={s.cardInner}>
                                 <Text style={s.cardEmoji}>{action.emoji}</Text>
                                 {action.badge > 0 && (
                                     <View style={s.badge}><Text style={s.badgeText}>{action.badge > 9 ? '9+' : action.badge}</Text></View>
                                 )}
                             </View>
-                            <Text style={s.cardTitle}>{action.title}</Text>
+                            <Text style={s.cardTitle} numberOfLines={1} ellipsizeMode="tail">{action.title}</Text>
                         </TouchableOpacity>
                     ))}
                 </View>
+
+                {ttsEnabled && speaking && (
+                    <Text style={s.ttsHint}>Lectura activa…</Text>
+                )}
             </ScrollView>
         </SafeAreaView>
     );
 }
 
 const s = StyleSheet.create({
-    safe: { flex: 1, backgroundColor: 'transparent' }, 
+    safe: { flex: 1, backgroundColor: 'transparent' },
     scroll: { padding: 20 },
     greeting: { backgroundColor: '#1E3A5F', borderRadius: 16, padding: 18, marginBottom: 20 },
-    greetTitle: { fontSize: 20, fontWeight: 'bold', color: '#FFFFFF' }, 
+    greetTitle: { fontSize: 20, fontWeight: 'bold', color: '#FFFFFF' },
     greetSub: { fontSize: 13, color: '#94A3B8', marginTop: 2 },
     logo: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#FFFFFF', marginLeft: 10 },
     section: { fontSize: 18, fontWeight: 'bold', color: '#334155', marginBottom: 12 },
     grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 24 },
     card: { width: '31%', borderRadius: 14, paddingVertical: 14, paddingHorizontal: 6, alignItems: 'center', marginBottom: 10, elevation: 2 },
     cardInner: { position: 'relative', marginBottom: 4 },
-    cardEmoji: { fontSize: 26 }, 
-    cardTitle: { fontSize: 12, fontWeight: '600', color: '#334155', textAlign: 'center' },
-    badge: { position: 'absolute', top: -6, right: -14, backgroundColor: '#EF4444', borderRadius: 10, minWidth: 18, height: 18, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 3 },
+    cardEmoji: { fontSize: 26, lineHeight: 30 },
+    cardTitle: { fontSize: 11.5, fontWeight: '600', color: '#334155', textAlign: 'center', width: '100%' },
+    badge: {
+        position: 'absolute',
+        top: -6,
+        right: -14,
+        backgroundColor: '#EF4444',
+        borderRadius: 10,
+        minWidth: 18,
+        height: 18,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 3,
+    },
     badgeText: { color: '#FFFFFF', fontSize: 10, fontWeight: 'bold' },
+    ttsHint: { textAlign: 'center', color: '#64748B', fontSize: 12, marginTop: 4 },
 });
