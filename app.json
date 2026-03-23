@@ -2,7 +2,7 @@
   "expo": {
     "name": "JJVV",
     "slug": "jjvv-mobile",
-    "version": "2.0.0",
+    "version": "3.0.0",
     "orientation": "portrait",
     "icon": "./assets/logoJJVV.png",
     "userInterfaceStyle": "light",
@@ -28,6 +28,7 @@
         "backgroundColor": "#1E3A5F"
       },
       "package": "com.jjvv.mobile",
+      "versionCode": 3,
       "googleServicesFile": "./credentials/android/google-services.json",
       "config": {
         "googleMapsApiKey": "AIzaSyCWyXWAj4jhMkCr2V8K0wBGwGrnhTajulY"
