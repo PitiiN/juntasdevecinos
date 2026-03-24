@@ -16,7 +16,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.jjvv.mobile",
       "config": {
-        "googleMapsApiKey": "AIzaSyCWyXWAj4jhMkCr2V8K0wBGwGrnhTajulY"
+        "googleMapsApiKey": "${EXPO_PUBLIC_GOOGLE_MAPS_API_KEY}"
       },
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
@@ -31,7 +31,7 @@
       "versionCode": 3,
       "googleServicesFile": "./google-services.json",
       "config": {
-        "googleMapsApiKey": "AIzaSyCWyXWAj4jhMkCr2V8K0wBGwGrnhTajulY"
+        "googleMapsApiKey": "${EXPO_PUBLIC_GOOGLE_MAPS_API_KEY}"
       }
     },
     "plugins": [
